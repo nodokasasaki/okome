@@ -1429,6 +1429,7 @@ function saveRecord() {
   showToast('記録を保存しました');
   checkAndShowUnlock();
   checkAndShowNewTitle();
+  document.dispatchEvent(new Event('taskCompleted'));
 }
 
 // 生理モーダル（日付単位）
@@ -1504,6 +1505,7 @@ function switchScreen(name) {
   if (name === 'tasks')    renderTaskList();
   if (name === 'period')   renderPeriod();
   if (name === 'settings') renderSettings();
+  document.dispatchEvent(new CustomEvent('screenChanged', { detail: name }));
 }
 
 // ----------------------------------------------------------------
@@ -1578,7 +1580,7 @@ function bindEvents() {
     const tid  = card.dataset.taskId;
     const date = card.dataset.date;
     if (isDoneOn(tid, date)) { undoComplete(tid, date); showToast('取り消しました'); }
-    else                     { completeTask(tid, date); showToast('完了！'); checkAndShowUnlock(); checkAndShowNewTitle(); }
+    else                     { completeTask(tid, date); showToast('完了！'); checkAndShowUnlock(); checkAndShowNewTitle(); document.dispatchEvent(new Event('taskCompleted')); }
     renderCalendar();
   });
 
@@ -1594,6 +1596,7 @@ function bindEvents() {
     } else {
       completeTask(tid, date);
       checkAndShowNewTitle();
+      document.dispatchEvent(new Event('taskCompleted'));
       showToast('やった！ファーストタスク完了！🎉');
       // 完了後にタスク画面が解放されることを通知
       setTimeout(() => {
@@ -2153,3 +2156,128 @@ switchScreen('calendar');
 
 // 今日初回起動時のスプラッシュ
 showSplash();
+
+// ----------------------------------------------------------------
+// フローティングキャラクター（おにぎりくん）
+// ----------------------------------------------------------------
+(function initCharaFloat() {
+  const bubbleEl = document.getElementById('chara-bubble');
+  const imgEl    = document.getElementById('chara-float-img');
+  if (!bubbleEl || !imgEl) return;
+
+  let bubbleTimer = null;
+
+  // コンテキストに応じたセリフ一覧
+  const CHARA_MESSAGES = {
+    idle: [
+      'おつかれさま！\nおうちきれいかな？',
+      'こんにちは〜！\nいっしょにがんばろ！',
+      'ちょっと休んでね〜',
+      'タップしてみてね！',
+    ],
+    overdue: [
+      'ちょっとだけ\n遅れてるよ…大丈夫！',
+      'すこしずつで\nOKだよ！',
+      'できるときに\nやってみよう！',
+    ],
+    doneToday: [
+      'えらい！えらいよ〜！',
+      '今日もできたね！\nすごい！',
+      'きれいなおうち、\n気持ちいいね！',
+    ],
+    streak: [
+      '連続記録中！\nすごすぎる！',
+      'この調子だよ〜！',
+    ],
+    morning: [
+      'おはよう！\n今日もいいお天気だね',
+      'きょうも\nいちにちがんばろ！',
+    ],
+    night: [
+      'おつかれさま〜\nゆっくり休んでね',
+      'きょうも\nえらかったよ！',
+    ],
+  };
+
+  function getMessages() {
+    const h       = new Date().getHours();
+    const today   = D.today();
+    const logs    = DB.get(DB.K.logs);
+    const tasks   = DB.get(DB.K.tasks);
+    const doneToday = logs.filter(l => l.completedAt === today).length;
+    const overdue   = tasks.filter(t => daysUntilDue(t) < 0).length;
+
+    // 連続日数
+    let streak = 0;
+    let d = today;
+    while (logs.some(l => l.completedAt === d)) { streak++; d = D.addDays(d, -1); }
+
+    if (streak >= 3)    return CHARA_MESSAGES.streak;
+    if (doneToday > 0)  return CHARA_MESSAGES.doneToday;
+    if (overdue > 0)    return CHARA_MESSAGES.overdue;
+    if (h < 10)         return CHARA_MESSAGES.morning;
+    if (h >= 21)        return CHARA_MESSAGES.night;
+    return CHARA_MESSAGES.idle;
+  }
+
+  function showBubble(text, duration) {
+    if (bubbleTimer) clearTimeout(bubbleTimer);
+    bubbleEl.textContent = text;
+    bubbleEl.classList.remove('hide');
+    bubbleEl.classList.add('show');
+    bubbleTimer = setTimeout(() => {
+      bubbleEl.classList.remove('show');
+      bubbleEl.classList.add('hide');
+      setTimeout(() => {
+        bubbleEl.classList.remove('hide');
+        bubbleEl.textContent = '';
+      }, 220);
+    }, duration || 3500);
+  }
+
+  function pickRandom(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+  // タップで話しかける
+  imgEl.addEventListener('click', () => {
+    const msgs = getMessages();
+    showBubble(pickRandom(msgs), 3500);
+  });
+
+  // 画面切り替え時に一言
+  document.addEventListener('screenChanged', e => {
+    const screenMsgs = {
+      calendar: ['カレンダーだよ！\n今日の予定は？', 'きょうはなにする？'],
+      tasks:    ['タスク一覧だよ！\nこなせたらえらい！', 'まずは1個から！'],
+      period:   ['からだの記録\nちゃんとつけてえらい！', 'じぶんを大切にね！'],
+      settings: ['設定画面だよ！\nカスタマイズしてね', 'おうちに合わせてね！'],
+    };
+    const msgs = screenMsgs[e.detail];
+    if (msgs) setTimeout(() => showBubble(pickRandom(msgs), 2800), 400);
+  });
+
+  // タスク完了時に一言（welcomeパネルのクリックイベントの後）
+  document.addEventListener('taskCompleted', () => {
+    const cheerMsgs = [
+      'やった！えらい〜！！',
+      'できたね！すごい！',
+      'ひとつ片付いた！\nえらすぎ！',
+    ];
+    showBubble(pickRandom(cheerMsgs), 3000);
+  });
+
+  // 30秒ごとにアイドルセリフをランダム表示
+  setInterval(() => {
+    if (bubbleEl.textContent) return; // 表示中は割り込まない
+    const msgs = getMessages();
+    showBubble(pickRandom(msgs), 3000);
+  }, 30000);
+
+  // 初回：3秒後に挨拶
+  setTimeout(() => {
+    const h = new Date().getHours();
+    const greet = h < 10 ? 'おはよう！\nよろしくね！'
+                : h < 17 ? 'こんにちは！\nよろしくね！'
+                : 'おかえり！\nよろしくね！';
+    showBubble(greet, 3500);
+  }, 3000);
+})();
