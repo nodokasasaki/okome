@@ -1,0 +1,1169 @@
+/* ================================================================
+   おうちリズム — style.css  (Green Redesign)
+   ================================================================ */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  /* ---- Green palette ---- */
+  --g900: #1a3a2a;
+  --g800: #1f4d33;
+  --g700: #2d6a46;
+  --g600: #3a8a5c;
+  --g500: #4caf7d;   /* primary */
+  --g400: #72c99b;
+  --g300: #a8dfc0;
+  --g200: #d4f0e2;
+  --g100: #eaf8f1;
+  --g50:  #f4fbf7;
+
+  /* ---- Accent (warm) ---- */
+  --amber: #e8a020;
+  --amber-lt: #fef3d8;
+  --rose:  #d96b6b;
+  --rose-lt: #fdeaea;
+  --sky:   #4a90c4;
+  --sky-lt: #e0f0fa;
+  --lavender: #8b72be;
+  --lavender-lt: #ede9f8;
+  --coral: #e07a5f;
+  --coral-lt: #fdeee9;
+  --teal: #3aada8;
+  --teal-lt: #e0f5f4;
+
+  /* ---- Neutral ---- */
+  --ink:  #1e2d24;
+  --ink2: #3d5247;
+  --muted: #7a9b8a;
+  --border: #d0e8d8;
+  --border2: #b8d9c5;
+  --surface: #f4fbf7;
+  --white: #ffffff;
+
+  /* ---- Typography ---- */
+  --font: "Meiryo", "メイリオ", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+  --font-title: "Meiryo", "メイリオ", "Hiragino Sans", "Yu Gothic UI", system-ui, sans-serif;
+  --font-en: "Georgia", "Times New Roman", serif;
+
+  /* ---- Spacing / Radius ---- */
+  --r-sm: 10px;
+  --r:    16px;
+  --r-lg: 22px;
+  --r-xl: 28px;
+  --nav-h: 68px;
+  --safe-b: env(safe-area-inset-bottom, 0px);
+
+  /* ---- Shadows ---- */
+  --sh1: 0 1px 4px rgba(30,80,50,.08);
+  --sh2: 0 4px 16px rgba(30,80,50,.11);
+  --sh3: 0 8px 32px rgba(30,80,50,.15);
+}
+
+html, body {
+  height: 100%;
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--ink);
+  background: var(--g100);
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* ================================================================
+   Mobile layout (default / ~767px)
+   ================================================================ */
+#app {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100vh;
+  background: var(--g50);
+  position: relative;
+}
+
+/* ================================================================
+   Screen
+   ================================================================ */
+.screen { display: none; padding-bottom: calc(var(--nav-h) + var(--safe-b) + 8px); min-height: 100vh; }
+.screen.active { display: block; }
+
+/* ================================================================
+   Top bar
+   ================================================================ */
+.topbar {
+  position: sticky; top: 0; z-index: 100;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 14px 18px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  box-shadow: var(--sh1);
+}
+.topbar-left { display: flex; align-items: center; gap: 10px; }
+.topbar-logo {
+  width: 32px; height: 32px;
+}
+.topbar-title { font-size: 19px; font-weight: 600; color: var(--g800); letter-spacing: .5px; font-family: var(--font-title); }
+.topbar-sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.topbar-btn {
+  width: 36px; height: 36px; border-radius: 50%;
+  background: var(--g500); color: var(--white);
+  border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(76,175,125,.35);
+  transition: background .15s, transform .1s;
+  flex-shrink: 0;
+}
+.topbar-btn:active { transform: scale(.93); }
+.topbar-btn svg { width: 20px; height: 20px; }
+
+/* ================================================================
+   Bottom Nav
+   ================================================================ */
+.bottom-nav {
+  position: fixed; bottom: 0; left: 50%; transform: translateX(-50%);
+  width: 100%; max-width: 430px;
+  height: calc(var(--nav-h) + var(--safe-b));
+  padding-bottom: var(--safe-b);
+  background: var(--white);
+  border-top: 1px solid var(--border);
+  display: flex; z-index: 200;
+  box-shadow: 0 -2px 12px rgba(30,80,50,.08);
+}
+.nav-item {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 4px;
+  border: none; background: none; cursor: pointer;
+  color: var(--muted); font-size: 10px; font-weight: 700;
+  letter-spacing: .02em;
+  padding: 8px 4px;
+  transition: color .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-item.active { color: var(--g600); }
+.nav-item svg { width: 22px; height: 22px; }
+.nav-item .nav-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--g500); margin-top: -2px;
+  opacity: 0;
+}
+.nav-item.active .nav-dot { opacity: 1; }
+
+/* ================================================================
+   ===  CALENDAR SCREEN  ===
+   ================================================================ */
+.cal-screen-wrap { display: flex; flex-direction: column; }
+
+/* Header section */
+.cal-header-section {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 0 14px 14px;
+  box-shadow: var(--sh1);
+}
+
+/* Month nav */
+.cal-month-nav {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 4px 10px;
+}
+.cal-month-label {
+  font-size: 20px; font-weight: 800; color: var(--g800); letter-spacing: -.3px;
+}
+.cal-month-label span { color: var(--g500); }
+.cal-nav-btn {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: var(--g100); border: 1px solid var(--border);
+  color: var(--g700); font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background .15s;
+}
+.cal-nav-btn:active { background: var(--g200); }
+
+/* Genre filter tabs */
+.genre-tabs {
+  display: flex; gap: 7px; overflow-x: auto;
+  padding: 0 2px 2px; scrollbar-width: none;
+}
+.genre-tabs::-webkit-scrollbar { display: none; }
+.genre-tab {
+  flex-shrink: 0; display: flex; align-items: center; gap: 5px;
+  padding: 6px 14px; border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--white); color: var(--ink2);
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.genre-tab .genre-icon { width: 16px; height: 16px; flex-shrink: 0; }
+.genre-tab.active {
+  background: var(--g500); border-color: var(--g500); color: var(--white);
+  box-shadow: 0 2px 8px rgba(76,175,125,.3);
+}
+
+/* Calendar grid */
+.cal-grid-wrap { padding: 10px 10px 6px; }
+.cal-weekdays {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+.cal-wd {
+  text-align: center; font-size: 11px; font-weight: 700;
+  color: var(--muted); padding: 4px 0;
+}
+.cal-wd.sun { color: var(--rose); }
+.cal-wd.sat { color: var(--sky); }
+
+.cal-days {
+  display: grid; grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+.cal-day {
+  aspect-ratio: 1; border-radius: var(--r-sm);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600;
+  cursor: pointer; position: relative;
+  transition: background .12s;
+  -webkit-tap-highlight-color: transparent;
+}
+.cal-day:active { opacity: .7; }
+.cal-day.other-month { color: var(--border2); }
+.cal-day.today {
+  background: var(--g500); color: var(--white);
+  font-weight: 800;
+  box-shadow: 0 2px 8px rgba(76,175,125,.4);
+}
+.cal-day.selected:not(.today) {
+  background: var(--g200); color: var(--g800);
+  outline: 2px solid var(--g400);
+}
+/* dot indicators */
+.cal-day-dots {
+  display: flex; gap: 2px; position: absolute; bottom: 3px;
+}
+.cal-dot {
+  width: 4px; height: 4px; border-radius: 50%;
+}
+
+/* ================================================================
+   Day Detail Panel
+   ================================================================ */
+.day-panel {
+  background: var(--white);
+  border-top: 2px solid var(--border);
+  padding: 16px 14px;
+}
+.day-panel-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 12px;
+}
+.day-panel-date { font-size: 15px; font-weight: 800; color: var(--g800); }
+.day-panel-add {
+  display: flex; align-items: center; gap: 5px;
+  background: var(--g500); color: var(--white);
+  border: none; border-radius: 20px; padding: 6px 14px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  box-shadow: 0 2px 8px rgba(76,175,125,.3);
+}
+
+.day-task-list { display: flex; flex-direction: column; gap: 8px; }
+.day-task-card {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px; border-radius: var(--r-sm);
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.day-task-card.done {
+  background: var(--g50);
+  border-color: var(--g300);
+}
+.day-task-card:active { box-shadow: var(--sh1); }
+.day-task-icon {
+  width: 36px; height: 36px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.day-task-icon svg { width: 22px; height: 22px; }
+.day-task-body { flex: 1; min-width: 0; }
+.day-task-name { font-size: 14px; font-weight: 700; }
+.day-task-name.done-text { text-decoration: line-through; color: var(--muted); }
+.day-task-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.day-task-check {
+  width: 26px; height: 26px; border-radius: 50%;
+  border: 2px solid var(--border2); background: var(--white);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; transition: all .15s;
+}
+.day-task-check.done {
+  background: var(--g500); border-color: var(--g500);
+}
+.day-task-check svg { width: 14px; height: 14px; color: var(--white); }
+
+.day-empty {
+  text-align: center; padding: 28px 0 10px;
+  color: var(--muted); font-size: 13px;
+}
+.day-empty-illo { width: 80px; height: 80px; margin: 0 auto 10px; }
+
+/* ================================================================
+   ===  TASK LIST SCREEN  ===
+   ================================================================ */
+.task-screen-genre-bar {
+  display: flex; gap: 7px; overflow-x: auto;
+  padding: 10px 14px; scrollbar-width: none;
+  background: var(--white); border-bottom: 1px solid var(--border);
+}
+.task-screen-genre-bar::-webkit-scrollbar { display: none; }
+
+.task-genre-section { margin-bottom: 4px; }
+.task-genre-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 18px 8px;
+}
+.task-genre-header-icon {
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+}
+.task-genre-header-icon svg { width: 18px; height: 18px; }
+.task-genre-title { font-size: 14px; font-weight: 800; color: var(--ink2); flex: 1; }
+.task-genre-count { font-size: 11px; color: var(--muted); font-weight: 700; }
+
+.task-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 18px;
+  background: var(--white);
+  border-bottom: 1px solid var(--g50);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.task-item-icon {
+  width: 40px; height: 40px; border-radius: var(--r-sm);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.task-item-icon svg { width: 24px; height: 24px; }
+.task-item-body { flex: 1; min-width: 0; }
+.task-item-name { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+.task-item-meta {
+  display: flex; gap: 8px; font-size: 11px; color: var(--muted);
+  align-items: center; flex-wrap: wrap;
+}
+.task-item-next { font-weight: 700; }
+.task-item-next.overdue { color: var(--rose); }
+.task-item-next.soon    { color: var(--amber); }
+.task-item-next.ok      { color: var(--g500); }
+.task-item-edit {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--g100); border: 1px solid var(--border);
+  color: var(--g700); font-size: 14px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+.pill {
+  display: inline-flex; align-items: center;
+  padding: 2px 8px; border-radius: 10px;
+  font-size: 10px; font-weight: 700;
+}
+.pill-daily    { background: var(--rose-lt);      color: var(--rose); }
+.pill-weekly   { background: var(--amber-lt);     color: var(--amber); }
+.pill-monthly  { background: var(--sky-lt);       color: var(--sky); }
+.pill-season   { background: var(--g200);         color: var(--g700); }
+.pill-yearly   { background: var(--lavender-lt);  color: var(--lavender); }
+
+/* ================================================================
+   ===  PERIOD SCREEN  ===
+   ================================================================ */
+.period-hero {
+  padding: 24px 18px 20px;
+  background: linear-gradient(135deg, #d96b6b 0%, #c45b8a 100%);
+  color: var(--white);
+}
+.period-hero-sub  { font-size: 12px; opacity: .8; margin-bottom: 4px; }
+.period-hero-main { font-size: 26px; font-weight: 800; letter-spacing: -.4px; margin-bottom: 8px; }
+.period-hero-next { font-size: 13px; opacity: .85; }
+
+.phase-bar-wrap { padding: 12px 14px; }
+.phase-bar      { display: flex; border-radius: 8px; overflow: hidden; height: 8px; }
+.phase-seg { flex: 1; transition: opacity .2s; }
+.phase-seg-m { background: var(--rose); }
+.phase-seg-f { background: var(--amber); }
+.phase-seg-o { background: var(--g500); }
+.phase-seg-l { background: var(--lavender); }
+.phase-seg.dim { opacity: .28; }
+/* ミニカレンダー（生理画面） */
+.period-cal-section {
+  padding: 6px 16px 4px;
+  border-bottom: 1px solid var(--border);
+}
+.period-cal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 0 4px;
+}
+.period-cal-month {
+  font-size: 12px; font-weight: 700; color: var(--g700);
+}
+/* 曜日ヘッダーを小さく */
+.period-cal-section .cal-weekdays .cal-wd {
+  font-size: 9px; padding: 2px 0;
+}
+/* 日付グリッド */
+.period-cal-days {
+  gap: 1px;
+}
+.period-cal-days .cal-day {
+  aspect-ratio: unset;
+  min-height: unset;
+  height: 22px;          /* 28px → 22px */
+  padding: 0;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 4px;
+}
+/* 今日 */
+.period-cal-days .cal-day.today {
+  background: var(--rose);
+  box-shadow: none;
+  font-size: 10px;
+}
+/* 記録済み生理日 */
+.period-cal-days .cal-day.period-day {
+  background: var(--rose-lt);
+  color: var(--rose);
+  font-weight: 700;
+}
+/* 予測日 */
+.period-cal-days .cal-day.period-pred {
+  background: #fdf0f0;
+  color: #c45b5b;
+  opacity: .8;
+}
+/* 当月日付はタップ可 */
+.period-cal-days .cal-day:not(.other-month) {
+  cursor: pointer;
+}
+.period-cal-days .cal-day:not(.other-month):active {
+  opacity: .6;
+}
+/* 前後月は薄く */
+.period-cal-days .cal-day.other-month {
+  opacity: .25;
+}
+
+.phase-legend {
+  display: flex; gap: 12px; padding: 0 14px 12px;
+  font-size: 11px; flex-wrap: wrap;
+}
+.phase-legend-item { display: flex; align-items: center; gap: 4px; color: var(--muted); font-weight: 600; }
+.phase-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* ================================================================
+   ===  SETTINGS SCREEN  ===
+   ================================================================ */
+.setting-section-header {
+  padding: 18px 18px 8px;
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  text-transform: uppercase; letter-spacing: .08em;
+}
+.setting-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px;
+  background: var(--white);
+  border-bottom: 1px solid var(--g50);
+}
+.setting-label { font-size: 15px; font-weight: 600; }
+.setting-label-sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.setting-ctrl { display: flex; gap: 8px; align-items: center; }
+.setting-select, .setting-input {
+  border: 1.5px solid var(--border2);
+  border-radius: var(--r-sm); padding: 6px 10px;
+  font-size: 14px; color: var(--ink);
+  background: var(--white); font-family: var(--font);
+  max-width: 150px;
+}
+.setting-select:focus, .setting-input:focus { outline: none; border-color: var(--g500); }
+
+/* ================================================================
+   Modals
+   ================================================================ */
+.modal-overlay {
+  position: fixed; inset: 0; z-index: 500;
+  background: rgba(30,80,50,.45);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+.modal-overlay.hidden { display: none; }
+.modal {
+  background: var(--white);
+  border-radius: var(--r-xl) var(--r-xl) 0 0;
+  width: 100%; max-width: 430px;
+  padding: 22px 18px calc(30px + var(--safe-b));
+  max-height: 92vh; overflow-y: auto;
+}
+.modal-handle {
+  width: 36px; height: 4px; border-radius: 2px;
+  background: var(--border2); margin: 0 auto 18px;
+}
+.modal-title {
+  font-size: 18px; font-weight: 800; color: var(--g800);
+  margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.modal-close {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--g100); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+}
+
+/* Form */
+.form-group { margin-bottom: 16px; }
+.form-label { font-size: 13px; font-weight: 700; color: var(--ink2); margin-bottom: 6px; display: block; }
+.form-input, .form-select, .form-textarea {
+  width: 100%;
+  border: 1.5px solid var(--border2);
+  border-radius: var(--r-sm); padding: 11px 13px;
+  font-size: 15px; color: var(--ink);
+  background: var(--white); font-family: var(--font);
+  transition: border-color .15s;
+}
+.form-input:focus, .form-select:focus, .form-textarea:focus {
+  outline: none; border-color: var(--g500);
+  box-shadow: 0 0 0 3px rgba(76,175,125,.15);
+}
+.form-textarea { resize: vertical; min-height: 72px; }
+
+.radio-group { display: flex; gap: 8px; flex-wrap: wrap; }
+.radio-btn {
+  border: 1.5px solid var(--border2); border-radius: 20px;
+  padding: 6px 14px; font-size: 13px; font-weight: 600;
+  color: var(--ink2); background: var(--white); cursor: pointer;
+  transition: all .15s; font-family: var(--font);
+}
+.radio-btn.active {
+  background: var(--g500); border-color: var(--g500); color: var(--white);
+  box-shadow: 0 2px 8px rgba(76,175,125,.3);
+}
+
+.btn-primary {
+  width: 100%; padding: 15px;
+  background: var(--g500); color: var(--white);
+  border: none; border-radius: var(--r); font-size: 16px; font-weight: 800;
+  cursor: pointer; margin-top: 8px;
+  box-shadow: 0 4px 14px rgba(76,175,125,.35);
+  transition: opacity .15s, transform .1s;
+  font-family: var(--font);
+}
+.btn-primary:active { opacity: .85; transform: scale(.98); }
+.btn-secondary {
+  width: 100%; padding: 13px;
+  background: var(--g100); color: var(--g800);
+  border: 1.5px solid var(--border2); border-radius: var(--r);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  margin-top: 8px; font-family: var(--font);
+}
+.btn-danger {
+  width: 100%; padding: 13px;
+  background: var(--rose-lt); color: var(--rose);
+  border: none; border-radius: var(--r);
+  font-size: 15px; font-weight: 700; cursor: pointer;
+  margin-top: 8px; font-family: var(--font);
+}
+
+/* ================================================================
+   Toast
+   ================================================================ */
+.toast {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-b) + 16px);
+  left: 50%; transform: translateX(-50%);
+  background: var(--g800); color: var(--white);
+  padding: 10px 22px; border-radius: 30px;
+  font-size: 13px; font-weight: 700;
+  z-index: 999; opacity: 0; pointer-events: none;
+  transition: opacity .2s; white-space: nowrap;
+  box-shadow: 0 4px 16px rgba(0,0,0,.2);
+}
+.toast.show { opacity: 1; }
+
+/* ================================================================
+   Misc
+   ================================================================ */
+.divider-bar { height: 8px; background: var(--g100); }
+button { font-family: var(--font); }
+svg { display: block; }
+.period-log-item {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 14px 18px; background: var(--white);
+  border-bottom: 1px solid var(--g50);
+}
+.period-log-date { font-size: 13px; font-weight: 700; width: 96px; flex-shrink: 0; color: var(--g700); }
+.period-log-body { flex: 1; font-size: 13px; color: var(--ink2); }
+.period-log-del  { background: none; border: none; color: var(--muted); font-size: 16px; cursor: pointer; padding: 4px; }
+.empty-state     { text-align: center; padding: 40px 20px; color: var(--muted); }
+.empty-illo      { width: 96px; height: 96px; margin: 0 auto 12px; }
+
+/* ================================================================
+   PC Layout  (min-width: 768px)
+   ================================================================ */
+@media (min-width: 768px) {
+
+  /* body */
+  body { background: var(--g800); overflow: hidden; }
+
+  /* #app: サイドバー(固定) + メインエリア */
+  #app {
+    max-width: 100%;
+    margin: 0;
+    background: transparent;
+    min-height: 100vh;
+  }
+
+  /* pc-main: サイドバーの右側を全幅で使う */
+  #pc-main {
+    margin-left: 220px;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--g50);
+  }
+
+  /* ============================================================
+     PC Sidebar Nav (bottom-nav を左固定サイドバーに変換)
+     ============================================================ */
+  .bottom-nav {
+    position: fixed;
+    top: 0; left: 0;
+    width: 220px;
+    height: 100vh;
+    max-width: 220px;
+    transform: none;
+    flex-direction: column;
+    justify-content: flex-start;
+    padding: 0;
+    border-top: none;
+    border-right: 1px solid rgba(255,255,255,.1);
+    background: var(--g900);
+    box-shadow: 2px 0 12px rgba(0,0,0,.2);
+    z-index: 300;
+    gap: 0;
+    overflow-y: auto;
+  }
+
+  /* サイドバーロゴ */
+  .bottom-nav::before {
+    content: 'おうちリズム';
+    display: block;
+    padding: 26px 20px 22px 52px;
+    font-size: 15px;
+    font-weight: 600;
+    font-family: var(--font-title);
+    color: var(--white);
+    letter-spacing: .5px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+    margin-bottom: 8px;
+    flex-shrink: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='20' height='20' viewBox='0 0 24 24' fill='none'%3E%3Ccircle cx='12' cy='12' r='9' fill='%234caf7d' opacity='.4'/%3E%3Ccircle cx='12' cy='12' r='5' fill='%234caf7d' opacity='.7'/%3E%3Ccircle cx='12' cy='12' r='2.5' fill='%23fff'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 20px center;
+  }
+
+  .nav-item {
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 12px;
+    padding: 12px 20px;
+    font-size: 14px;
+    font-weight: 700;
+    color: rgba(255,255,255,.5);
+    border-radius: 8px;
+    margin: 2px 8px;
+    letter-spacing: 0;
+    transition: background .15s, color .15s;
+    width: auto;
+  }
+  .nav-item svg { width: 20px; height: 20px; flex-shrink: 0; }
+  .nav-item.active {
+    color: var(--white);
+    background: rgba(76,175,125,.22);
+  }
+  .nav-item:hover:not(.active) {
+    color: rgba(255,255,255,.8);
+    background: rgba(255,255,255,.06);
+  }
+  .nav-item .nav-dot { display: none; }
+
+  /* ============================================================
+     Screen: スマホのパディングをリセット、通常のblockに
+     ============================================================ */
+  .screen {
+    display: none;
+    padding-bottom: 40px;
+    min-height: 100vh;
+  }
+  .screen.active { display: block; }
+
+  /* スマホ用トップバーは非表示 */
+  .topbar { display: none !important; }
+
+  /* ============================================================
+     PC Page header（各画面のタイトルバー）
+     ============================================================ */
+  .pc-page-header {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    padding: 24px 32px 18px;
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  .pc-page-header-title {
+    font-size: 22px; font-weight: 800;
+    color: var(--g800); letter-spacing: -.4px;
+  }
+  .pc-page-header-sub {
+    font-size: 12px; color: var(--muted); margin-top: 2px;
+  }
+
+  /* ============================================================
+     PC Calendar: 2カラム (カレンダー左 + 詳細右)
+     ============================================================ */
+  #screen-calendar {
+    display: none;          /* JSで active のときだけ block → flex に変更 */
+    min-height: 100vh;
+    padding-bottom: 0;
+  }
+  #screen-calendar.active {
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  /* 左カラム: カレンダー本体 */
+  #screen-calendar .cal-header-section {
+    flex: 0 0 460px;
+    max-width: 520px;
+    min-width: 340px;
+    height: 100vh;
+    overflow-y: auto;
+    border-bottom: none;
+    border-right: 1px solid var(--border);
+    box-shadow: none;
+    position: relative;
+  }
+
+  /* 右カラム: 日詳細パネル */
+  #screen-calendar .day-panel {
+    flex: 1;
+    height: 100vh;
+    overflow-y: auto;
+    border-top: none;
+    border-left: none;
+    padding: 28px 28px 40px;
+    background: var(--g50);
+  }
+
+  /* ============================================================
+     PC Tasks
+     ============================================================ */
+  #screen-tasks.active { display: block; }
+  #screen-tasks .task-screen-genre-bar {
+    position: sticky; top: 0; z-index: 10;
+    padding: 12px 32px;
+    background: var(--white);
+    border-bottom: 1px solid var(--border);
+  }
+  #task-list-body .task-item        { padding: 14px 32px; }
+  #task-list-body .task-genre-header { padding: 16px 32px 8px; }
+
+  /* ============================================================
+     PC Period
+     ============================================================ */
+  #screen-period.active { display: block; }
+  .period-hero {
+    border-radius: var(--r-lg);
+    margin: 24px 24px 0;
+  }
+  .phase-bar-wrap { padding: 16px 24px; }
+  .phase-legend   { padding: 0 24px 16px; }
+
+  /* ============================================================
+     PC Settings
+     ============================================================ */
+  #screen-settings.active { display: block; }
+  #screen-settings {
+    max-width: 700px;
+    padding-top: 0;
+  }
+  .setting-section-header { padding: 24px 32px 8px; }
+  .setting-row { padding: 14px 32px; }
+
+  /* ============================================================
+     Modal: 画面中央にポップアップ
+     ============================================================ */
+  .modal-overlay {
+    align-items: center;
+    background: rgba(10,30,18,.6);
+  }
+  .modal {
+    border-radius: var(--r-xl);
+    max-width: 480px;
+    max-height: 88vh;
+    padding: 28px 28px 32px;
+  }
+  .modal-handle { display: none; }
+
+  /* Toast */
+  .toast {
+    bottom: 32px;
+    left: calc(220px + 50%);
+    transform: translateX(-50%);
+  }
+}
+
+/* ================================================================
+   Wide PC  (min-width: 1200px)
+   ================================================================ */
+@media (min-width: 1200px) {
+  #screen-calendar .cal-header-section {
+    flex: 0 0 560px;
+    max-width: 600px;
+  }
+}
+
+/* ================================================================
+   SPLASH — 今日のおむかえ
+   ================================================================ */
+
+/* キーフレーム */
+@keyframes splash-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes splash-card-up {
+  from { opacity: 0; transform: translateY(40px) scale(.96); }
+  to   { opacity: 1; transform: translateY(0)    scale(1);   }
+}
+@keyframes splash-icon-pop {
+  0%   { transform: scale(0) rotate(-20deg); opacity: 0; }
+  60%  { transform: scale(1.25) rotate(8deg); opacity: 1; }
+  80%  { transform: scale(.9) rotate(-3deg); }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes splash-float {
+  0%, 100% { transform: translateY(0); }
+  50%       { transform: translateY(-8px); }
+}
+@keyframes splash-text-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes particle-rise {
+  0%   { transform: translateY(0) scale(1);   opacity: .8; }
+  100% { transform: translateY(-120px) scale(0); opacity: 0; }
+}
+
+/* オーバーレイ */
+.splash-overlay {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  background: rgba(20, 50, 34, .55);
+  backdrop-filter: blur(6px);
+  animation: splash-fade-in .35s ease both;
+}
+.splash-overlay.hidden { display: none; }
+
+/* カード */
+.splash-card {
+  position: relative;
+  width: min(340px, 90vw);
+  background: var(--white);
+  border-radius: 28px;
+  padding: 36px 28px 28px;
+  text-align: center;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(20,50,34,.28);
+  animation: splash-card-up .5s cubic-bezier(.22,.9,.36,1) .1s both;
+}
+/* カード上部の緑グラデーション帯 */
+.splash-card::before {
+  content: '';
+  position: absolute; inset: 0 0 auto 0;
+  height: 2px;
+  background: linear-gradient(90deg, #c8f0c8, #90ee90, #b2f0b2);
+  border-radius: 28px 28px 0 0;
+}
+
+/* パーティクルコンテナ */
+.splash-particles {
+  position: absolute; inset: 0; pointer-events: none; overflow: hidden;
+}
+.splash-particle {
+  position: absolute;
+  border-radius: 50%;
+  animation: particle-rise 2.4s ease-out forwards;
+}
+
+/* アイコン */
+.splash-icon {
+  font-size: 52px; line-height: 1;
+  margin-bottom: 12px;
+  display: inline-block;
+  animation: splash-icon-pop .7s cubic-bezier(.22,.9,.36,1) .3s both,
+             splash-float 3.2s ease-in-out 1.2s infinite;
+}
+
+/* 挨拶 */
+.splash-greeting {
+  font-size: 22px; font-weight: 900;
+  color: var(--g800);
+  margin-bottom: 6px;
+  animation: splash-text-in .5s ease .55s both;
+}
+
+/* アクティビティコメント */
+.splash-activity {
+  font-size: 13px; font-weight: 600;
+  color: var(--g600);
+  background: var(--g100);
+  border-radius: 12px;
+  padding: 8px 14px;
+  margin: 10px 0 18px;
+  line-height: 1.6;
+  animation: splash-text-in .5s ease .7s both;
+}
+
+/* 偉人の言葉 */
+.splash-quote-wrap {
+  border-top: 1px solid var(--border);
+  padding-top: 16px;
+  margin-bottom: 22px;
+  animation: splash-text-in .5s ease .85s both;
+}
+.splash-quote-text {
+  font-size: 14px; font-weight: 700;
+  color: var(--ink);
+  line-height: 1.75;
+  font-style: italic;
+  margin-bottom: 6px;
+}
+.splash-quote-author {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+/* ボタン */
+.splash-close {
+  width: 100%;
+  padding: 15px;
+  background: var(--g500); color: var(--white);
+  border: none; border-radius: 16px;
+  font-size: 16px; font-weight: 800;
+  cursor: pointer;
+  box-shadow: 0 4px 16px rgba(76,175,125,.4);
+  transition: opacity .15s, transform .1s;
+  font-family: var(--font);
+  animation: splash-text-in .5s ease 1s both;
+}
+.splash-close:active { opacity: .85; transform: scale(.98); }
+
+/* ================================================================
+   WELCOME PANEL（ファーストタスク未完了時）
+   ================================================================ */
+#cal-welcome-panel {
+  padding: 20px 14px;
+}
+.welcome-step {
+  display: flex;
+  gap: 14px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 18px 16px;
+  box-shadow: var(--sh1);
+}
+.welcome-step-icon { flex-shrink: 0; }
+.welcome-step-body { flex: 1; min-width: 0; }
+.welcome-step-title {
+  font-size: 14px; font-weight: 800; color: var(--g800);
+  margin-bottom: 6px;
+}
+.welcome-step-desc {
+  font-size: 12px; color: var(--muted); line-height: 1.7;
+  margin-bottom: 14px;
+}
+.welcome-first-task {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--r-sm);
+  border: 1.5px solid var(--border);
+  background: var(--white);
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.welcome-first-task.done {
+  background: var(--g50);
+  border-color: var(--g300);
+}
+.welcome-first-task:active { box-shadow: var(--sh1); }
+
+/* ================================================================
+   TASKS LOCKED（タスク画面ロック時）
+   ================================================================ */
+.tasks-locked {
+  text-align: center;
+  padding: 60px 20px 40px;
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.tasks-locked-title {
+  font-size: 16px; font-weight: 800; color: var(--g800);
+}
+.tasks-locked-desc {
+  font-size: 13px; color: var(--muted); line-height: 1.8;
+}
+
+/* ================================================================
+   AI提案カード
+   ================================================================ */
+.suggest-section {
+  margin: 8px 0 24px;
+}
+.suggest-header {
+  display: flex; align-items: center; gap: 6px;
+  padding: 14px 18px 10px;
+  font-size: 13px; font-weight: 800; color: var(--amber);
+}
+.suggest-header-sub {
+  font-size: 11px; font-weight: 600; color: var(--muted);
+  margin-left: auto;
+}
+.suggest-card {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px 18px;
+  background: var(--white);
+  border-bottom: 1px solid var(--g50);
+}
+.suggest-card-body { flex: 1; min-width: 0; }
+.suggest-card-name {
+  font-size: 15px; font-weight: 700; margin-bottom: 4px;
+}
+.suggest-card-meta {
+  display: flex; gap: 8px; align-items: center; margin-bottom: 4px;
+}
+.suggest-card-reason {
+  font-size: 11px; color: var(--muted); line-height: 1.6;
+}
+.suggest-card-actions {
+  display: flex; flex-direction: column; gap: 4px; flex-shrink: 0;
+}
+.suggest-add-btn {
+  padding: 5px 12px;
+  background: var(--g500); color: var(--white);
+  border: none; border-radius: 14px;
+  font-size: 12px; font-weight: 700; cursor: pointer;
+  white-space: nowrap; font-family: var(--font);
+  transition: opacity .15s;
+}
+.suggest-add-btn:active { opacity: .8; }
+.suggest-dismiss-btn {
+  padding: 5px 8px;
+  background: none; color: var(--muted);
+  border: 1px solid var(--border); border-radius: 14px;
+  font-size: 12px; cursor: pointer;
+  font-family: var(--font);
+  transition: background .15s;
+}
+.suggest-dismiss-btn:active { background: var(--g100); }
+
+/* PC: 提案カードのpadding拡大 */
+@media (min-width: 768px) {
+  #cal-welcome-panel { padding: 28px; }
+  .welcome-step { padding: 24px; }
+  .suggest-card { padding: 14px 32px; }
+  .suggest-header { padding: 16px 32px 10px; }
+  .tasks-locked { padding-top: 80px; }
+}
+
+/* ================================================================
+   称号バッジ（コンパクト: カレンダーヘッダー用）
+   ================================================================ */
+.title-badge-compact {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px 3px 5px; border-radius: 14px;
+  font-size: 11px; font-weight: 800;
+  letter-spacing: .02em;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+.title-badge-compact svg { display: block; flex-shrink: 0; }
+.title-badge-compact-label { line-height: 1; }
+.title-badge-icon { display: flex; align-items: center; }
+.title-badge-icon svg { display: block; }
+/* モーダルのアイコン：大きく表示 */
+#title-modal-icon svg { width: 52px; height: 52px; display: block; margin: 0 auto; }
+#cal-title-badge {
+  padding: 0 14px 10px;
+}
+
+/* ================================================================
+   称号バッジ（フル: タスク画面用）
+   ================================================================ */
+#tasks-title-badge {
+  padding: 12px 18px 0;
+}
+.title-badge-wrap {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r);
+  padding: 12px 16px;
+  margin-bottom: 4px;
+}
+.title-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 14px; border-radius: 20px;
+  font-size: 13px; font-weight: 800;
+  margin-bottom: 8px;
+}
+.title-badge-icon { font-size: 16px; }
+.title-badge-label { letter-spacing: .02em; }
+.title-badge-score { font-size: 10px; font-weight: 600; opacity: .7; }
+.title-progress-wrap {
+  height: 6px; background: var(--border); border-radius: 3px;
+  overflow: hidden; margin-bottom: 4px;
+}
+.title-progress-bar {
+  height: 100%; border-radius: 3px;
+  transition: width .4s ease;
+  min-width: 4px;
+}
+.title-progress-label {
+  font-size: 11px; color: var(--muted); font-weight: 600;
+}
+
+/* PC: 称号エリアのpadding */
+@media (min-width: 768px) {
+  #tasks-title-badge { padding: 16px 32px 0; }
+  #cal-title-badge { padding: 0 14px 8px; }
+}
+
+/* ================================================================
+   称号UPモーダル
+   ================================================================ */
+.title-up-badge {
+  display: inline-block;
+  background: linear-gradient(135deg, #fef3d8, #fdeee9);
+  color: var(--amber);
+  border: 1.5px solid var(--amber);
+  border-radius: 20px;
+  padding: 4px 16px; font-size: 11px; font-weight: 800;
+  margin-bottom: 16px; letter-spacing: .5px;
+}
+.title-up-icon {
+  font-size: 52px; line-height: 1;
+  margin-bottom: 10px;
+  display: block;
+}

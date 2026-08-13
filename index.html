@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="おうちリズム">
+  <meta name="theme-color" content="#4caf7d">
+  <title>おうちリズム</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div id="app">
+<div id="pc-main">
+
+<!-- ================================================================
+     SCREEN: CALENDAR (default)
+     ================================================================ -->
+<div class="screen active" id="screen-calendar">
+  <div class="cal-header-section">
+
+    <!-- Month navigation + 称号バッジ -->
+    <div class="cal-month-nav">
+      <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
+      <div class="cal-month-label" id="cal-month-label"></div>
+      <button class="cal-nav-btn" id="cal-next">&#8250;</button>
+    </div>
+    <div id="cal-title-badge"></div>
+
+    <!-- Genre filter tabs -->
+    <div class="genre-tabs" id="genre-tabs"></div>
+
+    <!-- Calendar grid -->
+    <div class="cal-grid-wrap">
+      <div class="cal-weekdays" id="cal-weekdays"></div>
+      <div class="cal-days" id="cal-days"></div>
+    </div>
+  </div>
+
+  <!-- ウェルカムパネル（ファーストタスク未完了時に表示） -->
+  <div id="cal-welcome-panel" style="display:none;"></div>
+
+  <!-- Day detail panel（ファーストタスク完了後に表示） -->
+  <div class="day-panel">
+    <div class="day-panel-header">
+      <div class="day-panel-date" id="day-panel-date"></div>
+      <button class="day-panel-add" id="btn-record-done">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
+        完了を記録
+      </button>
+    </div>
+    <div class="day-task-list" id="day-task-list"></div>
+  </div>
+</div>
+
+<!-- ================================================================
+     SCREEN: TASK LIST
+     ================================================================ -->
+<div class="screen" id="screen-tasks">
+  <!-- スマホ用トップバー -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div>
+        <div class="topbar-title">タスク管理</div>
+        <div class="topbar-sub" id="tasks-sub"></div>
+      </div>
+    </div>
+    <button class="topbar-btn" id="btn-add-task">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+  <!-- PC用ページヘッダー -->
+  <div class="pc-page-header" style="display:none;" id="pc-header-tasks">
+    <div>
+      <div class="pc-page-header-title">タスク管理</div>
+      <div class="pc-page-header-sub" id="tasks-sub-pc"></div>
+    </div>
+    <button class="topbar-btn" id="btn-add-task-pc" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+
+  <!-- 称号バッジエリア（タスク画面） -->
+  <div id="tasks-title-badge"></div>
+
+  <!-- Genre filter -->
+  <div class="task-screen-genre-bar" id="task-genre-bar"></div>
+
+  <!-- Task list grouped by genre -->
+  <div id="task-list-body"></div>
+</div>
+
+<!-- ================================================================
+     SCREEN: PERIOD
+     ================================================================ -->
+<div class="screen" id="screen-period">
+  <!-- スマホ用トップバー -->
+  <div class="topbar" id="topbar-period">
+    <div class="topbar-left">
+      <div class="topbar-title">生理記録</div>
+    </div>
+    <button class="topbar-btn" id="btn-add-period"
+      style="background:var(--rose); box-shadow:0 2px 8px rgba(217,107,107,.35);">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+  <!-- PC用ページヘッダー -->
+  <div class="pc-page-header" style="display:none;" id="pc-header-period">
+    <div>
+      <div class="pc-page-header-title">生理記録</div>
+    </div>
+    <button id="btn-add-period-pc" style="
+      display:none;
+      background:var(--rose-lt); color:var(--rose);
+      border:1.5px solid var(--rose); border-radius:20px;
+      padding:8px 18px; font-size:13px; font-weight:700; cursor:pointer;">
+      ＋ 記録する
+    </button>
+  </div>
+  <div class="period-hero">
+    <div class="period-hero-sub" id="period-phase-label">生理周期</div>
+    <div class="period-hero-main" id="period-day-label">記録してみよう</div>
+    <div class="period-hero-next" id="period-next-label"></div>
+  </div>
+
+  <!-- 周期サマリーカード -->
+  <div id="period-summary-cards" style="display:flex;gap:10px;padding:12px 16px 4px;flex-wrap:wrap;"></div>
+
+  <!-- ミニカレンダー（日付タップで記録） -->
+  <div class="period-cal-section">
+    <div class="period-cal-header">
+      <button class="cal-nav-btn" id="period-cal-prev">&#8249;</button>
+      <div id="period-cal-month-label" class="period-cal-month"></div>
+      <button class="cal-nav-btn" id="period-cal-next">&#8250;</button>
+      <button class="cal-nav-btn" id="period-cal-today" style="font-size:11px;padding:0 8px;width:auto;">本日</button>
+    </div>
+    <div class="cal-weekdays" id="period-cal-weekdays"></div>
+    <div class="cal-days period-cal-days" id="period-cal-days"></div>
+  </div>
+
+  <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px 6px; flex-wrap:wrap; gap:8px;">
+    <div style="font-size:13px; font-weight:700; color:var(--muted);">記録一覧</div>
+    <button id="btn-open-share" style="
+      background:var(--lavender-lt); color:var(--lavender);
+      border:1.5px solid var(--lavender);
+      border-radius:20px; padding:6px 14px;
+      font-size:12px; font-weight:700; cursor:pointer;">
+      パートナーと共有
+    </button>
+  </div>
+  <div id="period-log-list"></div>
+</div>
+
+<!-- ================================================================
+     SCREEN: SETTINGS
+     ================================================================ -->
+<div class="screen" id="screen-settings">
+  <!-- スマホ用トップバー -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="topbar-title">設定</div>
+    </div>
+  </div>
+  <!-- PC用ページヘッダー -->
+  <div class="pc-page-header" style="display:none;" id="pc-header-settings">
+    <div class="pc-page-header-title">設定</div>
+  </div>
+
+  <div class="setting-section-header">住まい・掃除レベル</div>
+  <div class="setting-row">
+    <div><div class="setting-label">住居タイプ</div></div>
+    <div class="setting-ctrl">
+      <select class="setting-select" id="setting-home-type">
+        <option value="1k">1K・1R</option>
+        <option value="1ldk">1LDK</option>
+        <option value="2ldk">2LDK</option>
+        <option value="3ldk">3LDK以上</option>
+      </select>
+    </div>
+  </div>
+  <div class="setting-row">
+    <div>
+      <div class="setting-label">掃除レベル</div>
+      <div class="setting-label-sub">タスクの量に反映されます</div>
+    </div>
+    <div class="setting-ctrl">
+      <select class="setting-select" id="setting-clean-level">
+        <option value="light">ゆるめ</option>
+        <option value="normal">普通</option>
+        <option value="strict">しっかり</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="divider-bar"></div>
+  <div class="setting-section-header">生理周期</div>
+  <div class="setting-row">
+    <div><div class="setting-label">平均周期（日）</div></div>
+    <div class="setting-ctrl">
+      <input type="number" class="setting-input" id="setting-cycle" min="21" max="45" value="28">
+    </div>
+  </div>
+  <div class="setting-row">
+    <div><div class="setting-label">平均生理日数</div></div>
+    <div class="setting-ctrl">
+      <input type="number" class="setting-input" id="setting-period-len" min="2" max="10" value="5">
+    </div>
+  </div>
+
+  <div class="divider-bar"></div>
+  <div class="setting-section-header">データ管理</div>
+  <div style="padding:14px 18px; display:flex; flex-direction:column; gap:10px;">
+    <button class="btn-secondary" id="btn-export">JSONでエクスポート</button>
+    <button class="btn-danger" id="btn-reset">全データをリセット</button>
+  </div>
+  <div style="padding:16px 18px 32px; font-size:12px; color:var(--muted); line-height:1.8;">
+    データはすべてこのデバイスのブラウザに保存されます。外部サーバーへの送信は行いません。
+  </div>
+</div>
+
+</div><!-- /#pc-main -->
+
+<!-- ================================================================
+     BOTTOM NAV
+     ================================================================ -->
+<nav class="bottom-nav">
+  <button class="nav-item" data-screen="calendar">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+    </svg>
+    カレンダー
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" data-screen="tasks">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2"/>
+      <rect x="9" y="3" width="6" height="4" rx="1"/>
+      <path d="M9 12h6M9 16h4"/>
+    </svg>
+    タスク
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" data-screen="period">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+      <path d="M12 21C12 21 4 15 4 9.5C4 5.4 7.6 2 12 2C16.4 2 20 5.4 20 9.5C20 15 12 21 12 21z" stroke-linejoin="round"/>
+      <path d="M12 2 Q10 8 12 13" stroke-linecap="round"/>
+    </svg>
+    生理
+    <div class="nav-dot"></div>
+  </button>
+  <button class="nav-item" data-screen="settings">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <circle cx="12" cy="12" r="3"/>
+      <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/>
+    </svg>
+    設定
+    <div class="nav-dot"></div>
+  </button>
+</nav>
+
+<!-- ================================================================
+     MODAL: タスク追加/編集
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-task">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">
+      <span id="modal-task-title-text">タスクを追加</span>
+      <button class="modal-close" id="modal-task-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="edit-task-id">
+
+    <div class="form-group">
+      <label class="form-label">タスク名</label>
+      <input type="text" class="form-input" id="input-task-name" placeholder="例：トイレ掃除">
+    </div>
+    <div class="form-group">
+      <label class="form-label">ジャンル</label>
+      <select class="form-select" id="input-task-genre">
+        <option value="toilet">トイレ</option>
+        <option value="kitchen">キッチン</option>
+        <option value="bath">浴室</option>
+        <option value="wash">洗面台</option>
+        <option value="living">リビング</option>
+        <option value="bedroom">寝室</option>
+        <option value="entrance">玄関</option>
+        <option value="window">窓・ベランダ</option>
+        <option value="other">その他</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <label class="form-label">周期</label>
+      <div class="radio-group" id="input-task-cycle">
+        <button class="radio-btn" data-val="daily">毎日</button>
+        <button class="radio-btn active" data-val="weekly">週1</button>
+        <button class="radio-btn" data-val="monthly">月1</button>
+        <button class="radio-btn" data-val="season">3ヶ月</button>
+        <button class="radio-btn" data-val="yearly">年1</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">難易度</label>
+      <div class="radio-group" id="input-task-diff">
+        <button class="radio-btn active" data-val="easy">軽め（5分以内）</button>
+        <button class="radio-btn" data-val="mid">普通（15分）</button>
+        <button class="radio-btn" data-val="hard">重め（30分〜）</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">メモ（任意）</label>
+      <textarea class="form-textarea" id="input-task-memo" placeholder="使う洗剤、注意事項など"></textarea>
+    </div>
+    <button class="btn-primary" id="btn-save-task">保存する</button>
+    <button class="btn-danger" id="btn-delete-task" style="display:none;">このタスクを削除</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: 完了記録（カレンダーの日付指定）
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-record">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">
+      <span id="modal-record-title">完了を記録</span>
+      <button class="modal-close" id="modal-record-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div style="font-size:13px; color:var(--muted); margin-bottom:14px;" id="modal-record-date-label"></div>
+    <div id="modal-record-task-list" style="display:flex; flex-direction:column; gap:8px; margin-bottom:16px;"></div>
+    <button class="btn-primary" id="btn-save-record">記録する</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: 生理記録（日付単位）
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-period">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">
+      <div style="font-size:15px;font-weight:800;color:var(--g800);">生理を記録</div>
+      <button class="modal-close" id="modal-period-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="form-group">
+      <label class="form-label">日付</label>
+      <input type="date" class="form-input" id="input-period-date" style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:14px;color:var(--ink);background:var(--white);box-sizing:border-box;">
+    </div>
+    <div class="form-group">
+      <label class="form-label">この日の経血量</label>
+      <div class="radio-group" id="input-period-flow">
+        <button class="radio-btn" data-val="light">少ない</button>
+        <button class="radio-btn active" data-val="normal">普通</button>
+        <button class="radio-btn" data-val="heavy">多い</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">症状（複数可）</label>
+      <div class="radio-group" id="input-period-symptoms">
+        <button class="radio-btn" data-val="stomachache">腹痛</button>
+        <button class="radio-btn" data-val="headache">頭痛</button>
+        <button class="radio-btn" data-val="fatigue">だるさ</button>
+        <button class="radio-btn" data-val="swelling">むくみ</button>
+        <button class="radio-btn" data-val="mood">気分の落ち込み</button>
+        <button class="radio-btn" data-val="none">なし</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">メモ（任意）</label>
+      <textarea class="form-textarea" id="input-period-memo" placeholder="体調の変化など"></textarea>
+    </div>
+    <button class="btn-primary" id="btn-save-period">この日を記録する</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: パートナー共有
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-share">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">
+      <div style="font-size:15px;font-weight:800;color:var(--g800);">パートナーと共有</div>
+      <button class="modal-close" id="modal-share-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- タブ切り替え -->
+    <div style="display:flex;gap:0;margin-bottom:16px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;">
+      <button id="share-tab-send" class="share-tab active" style="flex:1;padding:9px;font-size:13px;font-weight:700;background:var(--rose);color:#fff;border:none;cursor:pointer;">
+        送る
+      </button>
+      <button id="share-tab-receive" class="share-tab" style="flex:1;padding:9px;font-size:13px;font-weight:700;background:var(--white);color:var(--muted);border:none;cursor:pointer;">
+        受け取る
+      </button>
+    </div>
+
+    <!-- 送る -->
+    <div id="share-panel-send">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
+        一言コメントを添えて、メールまたはLINEでパートナーに送れます。
+      </div>
+      <div class="form-group">
+        <label class="form-label">コメント（任意）</label>
+        <input type="text" class="form-input" id="share-comment-input"
+          placeholder="「今月しんどかった」など一言メモ"
+          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;box-sizing:border-box;">
+      </div>
+      <!-- 送る方法ボタン群 -->
+      <div id="share-url-result" style="display:none; flex-direction:column; gap:8px;">
+        <button id="btn-share-line" style="
+          display:flex;align-items:center;justify-content:center;gap:8px;
+          width:100%;padding:12px;border-radius:12px;border:none;cursor:pointer;
+          background:#06C755;color:#fff;font-size:14px;font-weight:700;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 3.07 1.6 5.78 4.08 7.53L5.5 22l3.7-1.93C10.3 20.65 11.14 21 12 21c5.52 0 10-4.03 10-9s-4.48-9-10-9zm-3.5 11H7v-4.5h1.5V13zm2.75 0h-1.5v-4.5h1.5V13zm2.75 0h-1.5v-4.5H14V13z"/></svg>
+          LINEで送る
+        </button>
+        <button id="btn-share-email" style="
+          display:flex;align-items:center;justify-content:center;gap:8px;
+          width:100%;padding:12px;border-radius:12px;border:none;cursor:pointer;
+          background:var(--rose);color:#fff;font-size:14px;font-weight:700;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+          メールで送る
+        </button>
+        <button id="btn-copy-share-url" style="
+          display:flex;align-items:center;justify-content:center;gap:8px;
+          width:100%;padding:12px;border-radius:12px;cursor:pointer;
+          background:var(--white);color:var(--ink2);font-size:13px;font-weight:600;
+          border:1.5px solid var(--border);">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+          URLをコピー
+        </button>
+      </div>
+      <button class="btn-primary" id="btn-gen-share-url" style="background:var(--rose);border-color:var(--rose);margin-top:4px;">
+        共有リンクを作成
+      </button>
+    </div>
+
+    <!-- 受け取る -->
+    <div id="share-panel-receive" style="display:none;">
+      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
+        パートナーから受け取ったURLを貼り付けてください。<br>生理記録とコメントを閲覧できます。
+      </div>
+      <div class="form-group">
+        <textarea class="form-textarea" id="share-import-input" placeholder="共有URLを貼り付け"
+          style="font-size:12px;height:70px;"></textarea>
+        <button class="btn-secondary" id="btn-import-share-code" style="margin-top:6px;width:100%;">取り込む</button>
+      </div>
+      <!-- 受信データ表示 -->
+      <div id="share-received-preview" style="display:none;margin-top:8px;padding:12px;background:var(--rose-lt);border-radius:12px;">
+        <div style="font-size:12px;font-weight:700;color:var(--rose);margin-bottom:6px;">受信した記録</div>
+        <div id="share-received-detail" style="font-size:13px;color:var(--ink2);line-height:1.8;"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- ================================================================
+     MODAL: 称号UP通知
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-title-up">
+  <div class="modal" style="text-align:center;">
+    <div class="modal-handle"></div>
+    <div class="title-up-badge">称号ゲット！</div>
+    <div class="title-up-icon" id="title-modal-icon">🌱</div>
+    <div class="modal-title" style="justify-content:center;border:none;padding-bottom:4px;">
+      <div style="font-size:20px;font-weight:900;color:var(--g800);" id="title-modal-label"></div>
+    </div>
+    <div style="font-size:12px;font-weight:700;color:var(--amber);margin-bottom:8px;" id="title-modal-score"></div>
+    <div style="font-size:13px;color:var(--muted);line-height:1.7;margin-bottom:20px;" id="title-modal-desc"></div>
+    <button class="btn-primary" id="btn-title-up-close" style="margin-top:0;">やったー！</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: タスクアンロック（ゲーム要素）
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-unlock">
+  <div class="modal" style="text-align:center;">
+    <div class="modal-handle"></div>
+    <div id="unlock-badge" style="
+      display:inline-block; background:var(--amber-lt); color:var(--amber);
+      border:1.5px solid var(--amber); border-radius:20px;
+      padding:4px 14px; font-size:11px; font-weight:800;
+      margin-bottom:12px; letter-spacing:.5px;">
+      NEW TASK UNLOCKED
+    </div>
+    <div style="font-size:22px; margin-bottom:6px;" id="unlock-icon-wrap">
+      <svg viewBox="0 0 40 40" width="40" height="40" fill="none">
+        <rect width="40" height="40" rx="20" fill="#fef3d8"/>
+        <path d="M20 10l2.5 7.5H30l-6.5 4.5 2.5 7.5L20 25l-6 4.5 2.5-7.5L10 17.5h7.5z" fill="#e8a020"/>
+      </svg>
+    </div>
+    <div class="modal-title" style="justify-content:center; border:none; padding-bottom:0;">
+      <div style="font-size:16px; font-weight:800; color:var(--g800);" id="unlock-task-name"></div>
+    </div>
+    <div style="font-size:13px; color:var(--muted); margin:6px 0 16px; line-height:1.7;" id="unlock-task-desc"></div>
+    <div style="display:flex; gap:8px;">
+      <button class="btn-secondary" id="btn-unlock-skip" style="flex:1; margin:0;">あとで</button>
+      <button class="btn-primary"   id="btn-unlock-add"  style="flex:1; margin:0;">追加する</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================================================================
+     SPLASH: 今日のおむかえ（1日1回）
+     ================================================================ -->
+<div class="splash-overlay hidden" id="splash-overlay">
+  <div class="splash-card" id="splash-card">
+    <!-- 浮遊パーティクル -->
+    <div class="splash-particles" id="splash-particles"></div>
+
+    <!-- アイコン -->
+    <div class="splash-icon" id="splash-icon">✨</div>
+
+    <!-- 挨拶 -->
+    <div class="splash-greeting" id="splash-greeting">おかえり</div>
+
+    <!-- アクティビティコメント -->
+    <div class="splash-activity" id="splash-activity"></div>
+
+    <!-- 閉じるボタン -->
+    <button class="splash-close" id="splash-close">今日もはじめよう</button>
+  </div>
+</div>
+
+</div><!-- #app -->
+<script src="app.js"></script>
+</body>
+</html>

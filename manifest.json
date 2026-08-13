@@ -1,0 +1,22 @@
+{
+  "name": "おうちリズム",
+  "short_name": "おうちリズム",
+  "description": "掃除管理と生理周期を組み合わせた家事サポートアプリ",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#4f9cf9",
+  "icons": [
+    {
+      "src": "icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
