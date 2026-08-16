@@ -3,9 +3,12 @@
 
 | 環境 | URL | 更新タイミング |
 |------|-----|---------------|
-| **開発環境**（Cloudflare プレビュー） | https://okomedev.pages.dev | `git push origin dev` のたびに自動更新 |
-| **本番環境**（Cloudflare Pages） | https://okome.pages.dev | `git push origin main` のたびに自動更新 |
+| **本番環境**（Cloudflare Pages） | https://okomedev.pages.dev | `git push origin main` のたびに自動更新 |
 | **ローカル開発** | http://localhost:8080 | `python3 -m http.server 8080` で手動起動 |
+
+> ※ 現在 Cloudflare プロジェクトは `okomedev` の1つのみ。
+> ブランチは `main`（本番）/ `dev`（作業用）で運用しているが、公開URLは `okomedev.pages.dev` の1本。
+> 別途 `okome` プロジェクトを作成すれば本番/開発を別URLに分離できる。
 
 ---
 
@@ -22,12 +25,12 @@
 
 | ブランチ | 用途 |
 |----------|------|
-| `main`   | 本番環境（Cloudflare Pages 本番） |
-| `dev`    | 開発・作業用（機能追加・修正はここで行う） |
+| `main`   | 本番（`okomedev.pages.dev` に公開される） |
+| `dev`    | 作業用（ローカルで確認してからmainにマージ） |
 
 ```
-main  ← 本番（okome.pages.dev）
-  └─ dev ← 開発（okomedev.pages.dev）★作業ブランチ
+main  ← 本番公開（okomedev.pages.dev）
+  └─ dev ← 作業ブランチ★
 ```
 
 ---
