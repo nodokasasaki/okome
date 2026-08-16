@@ -307,8 +307,23 @@ html, body {
 .day-empty {
   text-align: center; padding: 28px 0 10px;
   color: var(--muted); font-size: 13px;
+  display: flex; flex-direction: column; align-items: center;
 }
 .day-empty-illo { width: 80px; height: 80px; margin: 0 auto 10px; }
+.day-empty-msg { margin-bottom: 16px; }
+.day-empty-suggest { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.day-empty-suggest-text {
+  font-size: 13px; font-weight: 700; color: var(--g700);
+}
+.day-empty-suggest-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: var(--g500); color: var(--white);
+  border: none; border-radius: var(--r-sm);
+  padding: 10px 20px; font-size: 14px; font-weight: 700;
+  cursor: pointer; box-shadow: var(--sh1);
+  transition: opacity .18s, transform .15s;
+}
+.day-empty-suggest-btn:active { opacity: .85; transform: scale(.97); }
 
 /* ================================================================
    ===  TASK LIST SCREEN  ===
@@ -1916,33 +1931,28 @@ svg { display: block; }
   padding: 8px 14px 0;
 }
 
-/* 検索バー＋日付ラベルの横並び行 */
+/* 日付＋検索バーの横並び行：日付左・検索バー左寄せ */
 .cal-search-row-outer {
   display: flex;
   align-items: center;
-  gap: 8px;
-  justify-content: space-between;
+  gap: 10px;
 }
 .cal-search-row-outer .cal-search-date-label {
-  flex: 0 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
 }
 .cal-search-row-outer .cal-search-bar {
   flex: 0 0 auto;
   width: 200px;
   min-width: 0;
 }
-/* 記録ボタン（検索バー横） */
-.cal-search-record-btn {
-  margin-top: 0 !important;
-}
 
 /* 日付ラベル */
 .cal-search-date-label {
-  font-size: 13px;
+  font-size: 20px;
   font-weight: 800;
   color: var(--g800);
   min-height: 24px;
+  letter-spacing: -.3px;
 }
 
 /* 検索バー本体：day-task-card と同じ白カード質感 */

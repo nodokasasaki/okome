@@ -774,8 +774,20 @@ function renderDayPanel(date) {
           <circle cx="28" cy="44" r="4" fill="#d4f0e2"/>
           <circle cx="52" cy="44" r="4" fill="#d4f0e2"/>
         </svg>
-        <div>この日のタスクはありません</div>
+        <div class="day-empty-msg">この日のタスクはありません</div>
+        <div class="day-empty-suggest">
+          <p class="day-empty-suggest-text">タスクを設定しませんか？</p>
+          <button class="day-empty-suggest-btn" id="btn-go-add-task">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+            タスクを追加する
+          </button>
+        </div>
       </div>`;
+    const goBtn = listEl.querySelector('#btn-go-add-task');
+    if (goBtn) goBtn.addEventListener('click', () => {
+      document.querySelector('.nav-item[data-screen="tasks"]')?.click();
+      setTimeout(() => document.getElementById('btn-add-task')?.click(), 150);
+    });
     return;
   }
 
@@ -1910,11 +1922,6 @@ function bindEvents() {
     if (!tab) return;
     calGenreFilter = tab.dataset.genre;
     renderCalendar();
-  });
-
-  // complete record button (day panel)
-  document.getElementById('btn-record-done').addEventListener('click', () => {
-    openRecordModal(calSelectedDate);
   });
 
   // day task card click (toggle done) — 通常のdayパネル
