@@ -3,12 +3,9 @@
 
 | 環境 | URL | 更新タイミング |
 |------|-----|---------------|
-| **本番環境**（Cloudflare Pages） | https://okomedev.pages.dev | `git push origin main` のたびに自動更新 |
+| **本番環境**（Cloudflare Pages） | https://ouchirhythm.pages.dev | `git push origin main` のたびに自動更新 |
+| **開発環境**（Cloudflare Pages） | https://okomedev.pages.dev | `git push origin main` のたびに自動更新 |
 | **ローカル開発** | http://localhost:8080 | `python3 -m http.server 8080` で手動起動 |
-
-> ※ 現在 Cloudflare プロジェクトは `okomedev` の1つのみ。
-> ブランチは `main`（本番）/ `dev`（作業用）で運用しているが、公開URLは `okomedev.pages.dev` の1本。
-> 別途 `okome` プロジェクトを作成すれば本番/開発を別URLに分離できる。
 
 ---
 
@@ -25,11 +22,11 @@
 
 | ブランチ | 用途 |
 |----------|------|
-| `main`   | 本番（`okomedev.pages.dev` に公開される） |
+| `main`   | 本番（`ouchirhythm.pages.dev` に公開される） |
 | `dev`    | 作業用（ローカルで確認してからmainにマージ） |
 
 ```
-main  ← 本番公開（okomedev.pages.dev）
+main  ← 本番公開（ouchirhythm.pages.dev）
   └─ dev ← 作業ブランチ★
 ```
 
