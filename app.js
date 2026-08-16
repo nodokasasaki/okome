@@ -593,10 +593,10 @@ function renderCalSearchResults(q) {
   const el = document.getElementById('cal-search-results');
   if (!el) return;
 
-  const query   = q.toLowerCase();
-  const tasks   = DB.get(DB.K.tasks);
-  const logs    = DB.get(DB.K.logs);
-  const today   = D.today();
+  const query = q.toLowerCase();
+  const tasks = DB.get(DB.K.tasks);
+  const logs  = DB.get(DB.K.logs);
+  const today = D.today();
 
   // ① タスク名・ジャンルラベルでマッチするタスクを探す
   const matchedTasks = tasks.filter(t => {
@@ -606,75 +606,77 @@ function renderCalSearchResults(q) {
   });
 
   if (!matchedTasks.length) {
-    el.innerHTML = `<div class="cal-search-empty">「${_escapeHtml(q)}」に一致するタスクはありません</div>`;
+    el.innerHTML = `
+      <div class="cal-search-empty">
+        「${_escapeHtml(q)}」に一致するタスクはありません
+        <div class="cal-search-empty-sub">タスク名やジャンル（キッチン・浴室など）で検索できます</div>
+      </div>`;
     return;
   }
 
-  // ② マッチしたタスクごとに「直近の完了ログ」と「次回予定日」を列挙（最大5件ずつ）
-  const rows = [];
-
+  // ② 完了ログ（新しい順・タスクごと最大4件）
+  const doneRows = [];
   matchedTasks.forEach(t => {
     const g = getGenre(t.genre);
-
-    // 過去ログ（新しい順・最大3件）
-    const taskLogs = logs
+    logs
       .filter(l => l.taskId === t.id)
       .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
-      .slice(0, 3);
-
-    taskLogs.forEach(l => {
-      rows.push({
-        date:     l.completedAt,
-        taskName: t.name,
-        genre:    g,
-        type:     'done',
-        isPast:   l.completedAt < today,
+      .slice(0, 4)
+      .forEach(l => {
+        doneRows.push({ date: l.completedAt, taskName: t.name, genre: g, type: 'done' });
       });
-    });
+  });
+  // 最新完了を先頭に
+  doneRows.sort((a, b) => b.date.localeCompare(a.date));
 
-    // 直近の予定日（未来・最大2件）
-    let cur = nextDue(t);
+  // ③ 次回予定日（近い順・タスクごと最大2件）
+  const upcomingRows = [];
+  matchedTasks.forEach(t => {
+    const g      = getGenre(t.genre);
     const cycleD = getCycleDays(t);
-    // 今日以前ならまず今日以降に進める
+    let cur = nextDue(t);
     while (cur < today) cur = D.addDays(cur, cycleD);
     for (let i = 0; i < 2; i++) {
-      rows.push({
-        date:     cur,
-        taskName: t.name,
-        genre:    g,
-        type:     'upcoming',
-        isPast:   false,
-      });
+      upcomingRows.push({ date: cur, taskName: t.name, genre: g, type: 'upcoming' });
       cur = D.addDays(cur, cycleD);
     }
   });
+  upcomingRows.sort((a, b) => a.date.localeCompare(b.date));
 
-  // 日付で降順ソート（過去ログ）→ 昇順（予定）に分けて表示
-  const pastRows     = rows.filter(r => r.type === 'done').sort((a,b) => b.date.localeCompare(a.date));
-  const upcomingRows = rows.filter(r => r.type === 'upcoming').sort((a,b) => a.date.localeCompare(b.date));
-  const allRows      = [...upcomingRows, ...pastRows].slice(0, 20);
-
-  if (!allRows.length) {
-    el.innerHTML = `<div class="cal-search-empty">「${_escapeHtml(q)}」の記録はまだありません</div>`;
-    return;
+  // ④ 完了優先で結合（完了が先、予定が後）上限20件
+  const sections = [];
+  if (doneRows.length) {
+    sections.push({ label: '完了履歴', rows: doneRows.slice(0, 12) });
+  }
+  if (upcomingRows.length) {
+    sections.push({ label: '次回予定', rows: upcomingRows.slice(0, 6) });
   }
 
-  el.innerHTML = allRows.map(r => {
-    const badgeClass = r.type === 'done' ? 'cal-search-badge-done' : 'cal-search-badge-upcoming';
-    const badgeText  = r.type === 'done' ? '完了' : '予定';
-    const isToday    = r.date === today;
-    return `
-    <div class="cal-search-row" data-search-date="${r.date}">
-      <div class="cal-search-row-icon" style="background:${r.genre.bg};">
-        <svg viewBox="0 0 24 24" fill="none" stroke="${r.genre.color}" stroke-width="1.8" width="16" height="16">${r.genre.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
-      </div>
-      <div class="cal-search-row-body">
-        <div class="cal-search-row-name">${_escapeHtml(r.taskName)}</div>
-        <div class="cal-search-row-date">${isToday ? '今日' : D.jpFull(r.date)}</div>
-      </div>
-      <span class="cal-search-badge ${badgeClass}">${badgeText}</span>
-    </div>`;
-  }).join('');
+  el.innerHTML = sections.map(sec => `
+    <div class="cal-search-section-header">${sec.label}</div>
+    ${sec.rows.map(r => {
+      const isDone  = r.type === 'done';
+      const isToday = r.date === today;
+      const dateStr = isToday ? '今日' : D.jpFull(r.date);
+      const checkSvg = isDone
+        ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" width="13" height="13"><path d="M5 13l4 4L19 7"/></svg>`
+        : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="12" height="12" style="color:var(--muted)"><path d="M9 18l6-6-6-6"/></svg>`;
+      return `
+      <div class="cal-search-row ${isDone ? 'is-done' : ''}" data-search-date="${r.date}">
+        <div class="cal-search-row-icon" style="background:${r.genre.bg};">
+          <svg viewBox="0 0 24 24" fill="none" stroke="${r.genre.color}" stroke-width="1.8" width="18" height="18">${r.genre.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
+        </div>
+        <div class="cal-search-row-body">
+          <div class="cal-search-row-name ${isDone ? 'is-done-text' : ''}">${_escapeHtml(r.taskName)}</div>
+          <div class="cal-search-row-meta">
+            <span class="cal-search-row-date">${dateStr}</span>
+            <span class="pill ${isDone ? 'pill-weekly' : 'pill-custom'}" style="${isDone ? 'background:var(--g200);color:var(--g700);' : 'background:var(--amber-lt);color:var(--amber);'}">${isDone ? '完了' : '予定'}</span>
+          </div>
+        </div>
+        <div class="cal-search-row-check ${isDone ? 'done' : 'upcoming'}">${checkSvg}</div>
+      </div>`;
+    }).join('')}
+  `).join('');
 }
 
 function renderDayPanel(date) {

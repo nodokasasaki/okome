@@ -1910,24 +1910,27 @@ svg { display: block; }
    カレンダー検索バー
    ================================================================ */
 .cal-search-wrap {
-  padding: 8px 10px 0;
+  padding: 8px 14px 0;
 }
+
+/* 検索バー本体：day-task-card と同じ白カード質感 */
 .cal-search-bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: var(--surface);
-  border: 1.5px solid var(--border2);
-  border-radius: 20px;
-  padding: 8px 12px;
-  transition: border-color .15s, box-shadow .15s;
+  gap: 10px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 10px 14px;
+  box-shadow: var(--sh1);
+  transition: border-color .18s, box-shadow .18s;
 }
 .cal-search-bar:focus-within {
   border-color: var(--g500);
-  box-shadow: 0 0 0 3px rgba(76,175,125,.12);
+  box-shadow: 0 0 0 3px rgba(76,175,125,.13), var(--sh1);
 }
 .cal-search-icon {
-  color: var(--muted);
+  color: var(--g400);
   flex-shrink: 0;
 }
 .cal-search-input {
@@ -1935,50 +1938,81 @@ svg { display: block; }
   border: none;
   background: transparent;
   font-size: 14px;
+  font-weight: 600;
   font-family: var(--font);
   color: var(--ink);
   outline: none;
   min-width: 0;
 }
-.cal-search-input::placeholder { color: var(--muted); }
+.cal-search-input::placeholder {
+  color: var(--muted);
+  font-weight: 400;
+}
 .cal-search-clear {
-  background: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--g200);
   border: none;
   cursor: pointer;
-  color: var(--muted);
-  padding: 2px;
+  color: var(--g700);
   display: flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
+  transition: background .15s;
 }
-.cal-search-clear:hover { color: var(--ink2); }
+.cal-search-clear:hover { background: var(--g300); }
 
-/* 検索結果パネル */
+/* 検索結果パネル：カードリスト風 */
 .cal-search-results {
-  margin-top: 6px;
+  margin-top: 8px;
   background: var(--white);
   border: 1.5px solid var(--border);
   border-radius: var(--r-sm);
   overflow: hidden;
   box-shadow: var(--sh2);
-  max-height: 320px;
+  max-height: 340px;
   overflow-y: auto;
 }
+
+/* セクション見出し（完了 / 予定） */
+.cal-search-section-header {
+  padding: 6px 14px 4px;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .06em;
+  color: var(--muted);
+  background: var(--g50);
+  border-bottom: 1px solid var(--border);
+  text-transform: uppercase;
+}
+
+/* 各行：day-task-card に揃えたカード風 */
 .cal-search-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 14px;
   cursor: pointer;
-  border-bottom: 1px solid var(--border);
+  background: var(--white);
+  border-bottom: 1px solid var(--g50);
   transition: background .12s;
+  -webkit-tap-highlight-color: transparent;
 }
 .cal-search-row:last-child { border-bottom: none; }
 .cal-search-row:active { background: var(--g100); }
+
+/* 完了行は薄緑背景 */
+.cal-search-row.is-done {
+  background: var(--g50);
+}
+.cal-search-row.is-done:active { background: var(--g100); }
+
 .cal-search-row-icon {
-  width: 32px;
-  height: 32px;
-  border-radius: 8px;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--r-sm);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1989,42 +2023,64 @@ svg { display: block; }
   min-width: 0;
 }
 .cal-search-row-name {
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: var(--ink);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.cal-search-row-name.is-done-text {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+.cal-search-row-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 3px;
+}
 .cal-search-row-date {
   font-size: 11px;
   color: var(--muted);
-  margin-top: 2px;
 }
-.cal-search-badge {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 10px;
+
+/* チェックマーク（完了）/ 矢印（予定） */
+.cal-search-row-check {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
 }
-.cal-search-badge-done {
-  background: var(--g200);
-  color: var(--g700);
+.cal-search-row-check.done {
+  background: var(--g500);
+  border: none;
 }
-.cal-search-badge-upcoming {
-  background: var(--amber-lt);
-  color: var(--amber);
+.cal-search-row-check.upcoming {
+  background: var(--white);
+  border: 1.5px solid var(--border2);
 }
+
 .cal-search-empty {
-  padding: 16px;
+  padding: 24px 16px;
   text-align: center;
-  font-size: 12px;
+  font-size: 13px;
+  font-weight: 600;
   color: var(--muted);
+}
+.cal-search-empty-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+  font-weight: 400;
 }
 
 /* PC */
 @media (min-width: 768px) {
   .cal-search-wrap { padding: 10px 18px 0; }
+  .cal-search-row { padding: 11px 18px; }
 }
 
