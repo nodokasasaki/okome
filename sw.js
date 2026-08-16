@@ -1,9 +1,12 @@
-const CACHE_NAME = 'ouchi-rhythm-v14';
+const CACHE_NAME = 'ouchi-rhythm-v15';
 const ASSETS = [
   './index.html',
   './app.js',
   './style.css',
-  './manifest.json'
+  './manifest.json',
+  './firebase-config.js',
+  './auth.js',
+  './db-cloud.js',
 ];
 
 self.addEventListener('install', e => {
@@ -25,5 +28,33 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   e.respondWith(
     caches.match(e.request).then(cached => cached || fetch(e.request))
+  );
+});
+
+// プッシュ通知受信（将来のWeb Push対応用）
+self.addEventListener('push', e => {
+  const data = e.data?.json?.() || {};
+  const title = data.title || 'おうちリズム';
+  const body  = data.body  || 'パートナーから通知が届きました';
+  e.waitUntil(
+    self.registration.showNotification(title, {
+      body,
+      icon: './kakusann.png',
+      badge: './kakusann.png',
+      tag: 'partner-notify',
+      renotify: true,
+    })
+  );
+});
+
+// 通知クリックでアプリを開く
+self.addEventListener('notificationclick', e => {
+  e.notification.close();
+  e.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+      const existing = cs.find(c => c.url.includes(self.location.origin));
+      if (existing) return existing.focus();
+      return clients.openWindow(self.location.origin + self.location.pathname.replace('sw.js', ''));
+    })
   );
 });

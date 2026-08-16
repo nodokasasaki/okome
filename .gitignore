@@ -19,3 +19,6 @@ npm-debug.log*
 .env
 .env.local
 .env.*.local
+
+# Firebase config（実際のAPIキーが含まれるためコミット対象外）
+firebase-config.js

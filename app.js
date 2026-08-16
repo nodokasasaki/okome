@@ -94,7 +94,7 @@ function getGenre(id) { return GENRES.find(g => g.id === id) || GENRES[GENRES.le
 // ----------------------------------------------------------------
 const DB = {
   // period_days: { date:'2024-01-01', flow:'normal'|'light'|'heavy'|'none', symptoms:[], memo:'' }
-  K: { tasks: 'or2_tasks', logs: 'or2_logs', period_days: 'or2_period_days', settings: 'or2_settings', partner: 'or2_partner', unlocked: 'or2_unlocked', dismissed_suggest: 'or2_dismissed_suggest', title_shown: 'or2_title_shown' },
+  K: { tasks: 'or2_tasks', logs: 'or2_logs', period_days: 'or2_period_days', settings: 'or2_settings', partner: 'or2_partner', unlocked: 'or2_unlocked', dismissed_suggest: 'or2_dismissed_suggest', title_shown: 'or2_title_shown', tutorial_cleared: 'or2_tutorial_cleared' },
   get(k)       { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } },
   getObj(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d;  } catch { return d; } },
   set(k, v)    { localStorage.setItem(k, JSON.stringify(v)); },
@@ -108,12 +108,17 @@ const FIRST_TASK = { name:'机の上を片付ける', genre:'living', cycle:'wee
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 5); }
 
-// ファーストタスクが完了済みかどうか（ログに1件以上あるか）
+// ファーストタスクが完了済みかどうか（ログに1件以上あるか、または一度クリアされたフラグがあるか）
 function isFirstTaskCleared() {
+  if (DB.getObj(DB.K.tutorial_cleared, false) === true) return true;
   const tasks = DB.get(DB.K.tasks);
   const first = tasks.find(t => t._isFirst);
   if (!first) return true; // データ構成が変わっていたら解放済み扱い
-  return DB.get(DB.K.logs).some(l => l.taskId === first.id);
+  const cleared = DB.get(DB.K.logs).some(l => l.taskId === first.id);
+  if (cleared) {
+    DB.set(DB.K.tutorial_cleared, true);
+  }
+  return cleared;
 }
 
 function initData() {
@@ -151,13 +156,25 @@ const D = {
 // 4. タスクロジック
 // ----------------------------------------------------------------
 const CYCLE_DAYS = { daily:1, weekly:7, monthly:30, season:90, yearly:365 };
-const CYCLE_LABELS = { daily:'毎日', weekly:'週1', monthly:'月1', season:'3ヶ月', yearly:'年1' };
-const CYCLE_PILL  = { daily:'pill-daily', weekly:'pill-weekly', monthly:'pill-monthly', season:'pill-season', yearly:'pill-yearly' };
+const CYCLE_LABELS = { daily:'毎日', weekly:'週1', monthly:'月1', season:'3ヶ月', yearly:'年1', custom:'カスタム' };
+const CYCLE_PILL  = { daily:'pill-daily', weekly:'pill-weekly', monthly:'pill-monthly', season:'pill-season', yearly:'pill-yearly', custom:'pill-custom' };
 const DIFF_LABELS = { easy:'軽め', mid:'普通', hard:'重め' };
+
+// タスクのサイクル日数を返す（custom は task.customDays を使用）
+function getCycleDays(task) {
+  if (task.cycle === 'custom') return Math.max(1, Number(task.customDays) || 1);
+  return CYCLE_DAYS[task.cycle] || 1;
+}
+
+// タスクの周期ラベルを返す
+function getCycleLabel(task) {
+  if (task.cycle === 'custom') return `${task.customDays || 1}日ごと`;
+  return CYCLE_LABELS[task.cycle] || '';
+}
 
 function nextDue(task) {
   if (!task.lastDone) return D.today();
-  return D.addDays(task.lastDone, CYCLE_DAYS[task.cycle]);
+  return D.addDays(task.lastDone, getCycleDays(task));
 }
 
 function daysUntilDue(task) { return D.diff(nextDue(task), D.today()); }  // negative = overdue
@@ -296,63 +313,141 @@ function getCurrentPhase() {
 }
 
 // ----------------------------------------------------------------
-// 5b. パートナー共有（URLベース）
+// 5b. パートナー共有（Firestoreルームベース）
 // ----------------------------------------------------------------
 
-// 直近60日分の生理記録をURLパラメータに変換して共有URLを生成
-function generateShareURL(comment) {
-  const days = DB.get(DB.K.period_days)
-    .filter(d => D.diff(D.today(), d.date) <= 180) // 直近180日
-    .sort((a,b) => a.date.localeCompare(b.date));
-  const s = DB.getObj(DB.K.settings, DEFAULT_SETTINGS);
-  const data = {
-    v: 2,
-    period_days: days,
-    cycleLength: s.cycleLength || 28,
-    periodLen:   s.periodLen   || 5,
-    sharedAt:    D.today(),
-    comment:     comment || '',
-  };
-  const encoded = btoa(encodeURIComponent(JSON.stringify(data)));
-  return `${location.href.split('?')[0]}?share=${encoded}`;
+// 現在接続中のルーム状態（インメモリ）
+let _shareRoom = null;          // { id, ownerUid, partnerUid }
+let _partnerPeriodDays = [];    // パートナーの生理記録（リアルタイム）
+let _roomComments = [];         // コメント一覧（リアルタイム）
+
+// 招待URL生成（ルームIDをURLパラメータに埋め込む）
+function buildInviteURL(roomId) {
+  return `${location.href.split('?')[0]}?room=${roomId}`;
 }
 
-// URLからパートナーデータを取り込む（URLパラメータ or 貼り付けURL or 旧コード）
-function importShareData(input) {
-  try {
-    const trimmed = input.trim();
-    let encoded = trimmed;
-    // URLの場合はパラメータを抽出
-    if (trimmed.includes('?share=')) {
-      encoded = trimmed.split('?share=')[1].split('&')[0];
+// ルーム接続開始（ルームが確定したら同期開始）
+function _attachRoom(room) {
+  _shareRoom = room;
+  DB.set(DB.K.partner, { roomId: room.id }); // roomIdだけ永続化
+
+  startShareRoomSync(
+    room.id,
+    // ルーム状態変化コールバック
+    updatedRoom => {
+      _shareRoom = { ..._shareRoom, ...updatedRoom };
+      renderShareModalState?.();
+      renderPeriod?.();
+    },
+    // パートナーのperiod_days変化コールバック
+    days => {
+      _partnerPeriodDays = days;
+      renderPeriod?.();
     }
-    const data = JSON.parse(decodeURIComponent(atob(encoded)));
-    if (!data.period_days) throw new Error('invalid');
-    DB.set(DB.K.partner, data);
-    return data;
-  } catch {
-    return null;
-  }
+  );
+
+  listenComments(room.id, comments => {
+    _roomComments = comments;
+    renderShareComments?.();
+  });
+
+  listenPartnerNotifications(room.id, notif => {
+    if (notif.type === 'period_updated') {
+      showToast('パートナーが生理記録を更新しました');
+      showBrowserNotification('パートナーが生理記録を更新しました', 'おうちリズム');
+    }
+  });
+}
+
+// 招待リンクを作成してURLを返す
+async function createInviteLink() {
+  const result = await createShareRoom();
+  if (result.error) return result;
+  const room = { id: result.roomId, ownerUid: getUserId(), partnerUid: null };
+  _attachRoom(room);
+  return { ok: true, url: buildInviteURL(result.roomId) };
+}
+
+// 招待URLを踏んだ側の処理
+async function acceptInvite(roomId) {
+  const result = await joinShareRoom(roomId);
+  if (result.error) return result;
+  const room = { id: roomId, ...result.room };
+  _attachRoom(room);
+  return { ok: true };
 }
 
 function getPartnerData() {
-  return DB.getObj(DB.K.partner, null);
+  return _shareRoom && _partnerPeriodDays.length
+    ? { roomId: _shareRoom.id, period_days: _partnerPeriodDays, sharedAt: D.today() }
+    : null;
 }
 
-// 起動時にURLパラメータを自動チェック
+function getShareRoomId() {
+  return _shareRoom?.id || null;
+}
+
+function isPartnerConnected() {
+  return !!(_shareRoom?.ownerUid && _shareRoom?.partnerUid);
+}
+
+// 生理記録更新時にパートナーへ通知（app.js の記録保存処理から呼ぶ）
+async function onPeriodUpdated() {
+  const roomId = getShareRoomId();
+  if (!roomId || !isPartnerConnected()) return;
+  await notifyPartnerPeriodUpdate(roomId);
+}
+
+// 起動時にURLパラメータを自動チェック（room= または 旧 share=）
 function checkShareURLOnLoad() {
   const params = new URLSearchParams(location.search);
-  const share = params.get('share');
-  if (!share) return;
-  const data = importShareData(`?share=${share}`);
-  if (data) {
-    // URLパラメータを除去してから通知
+
+  // 新方式：?room=<roomId>
+  const roomId = params.get('room');
+  if (roomId) {
     history.replaceState(null, '', location.pathname);
-    setTimeout(() => {
-      showToast('パートナーの記録を受信しました');
-      renderPeriod();
-    }, 500);
+    onAuthReady(async user => {
+      if (!user) {
+        // ログインが必要 → 認証モーダルを出してからもう一度実行
+        openAuthModal('login');
+        const _retry = setInterval(async () => {
+          if (!getUserId()) return;
+          clearInterval(_retry);
+          const result = await acceptInvite(roomId);
+          if (result.ok) {
+            showToast('パートナーと接続しました！');
+            renderPeriod?.();
+          } else {
+            showToast(result.error || '招待リンクが無効です');
+          }
+        }, 800);
+        return;
+      }
+      const result = await acceptInvite(roomId);
+      if (result.ok) {
+        showToast('パートナーと接続しました！');
+        renderPeriod?.();
+      } else {
+        showToast(result.error || '招待リンクが無効です');
+      }
+    });
+    return;
   }
+
+  // 起動時に既存ルームを復元
+  onAuthReady(async user => {
+    if (!user) return;
+    const saved = DB.getObj(DB.K.partner, null);
+    if (!saved?.roomId) return;
+    try {
+      const snap = await _db?.collection('share_rooms').doc(saved.roomId).get();
+      if (!snap?.exists) { DB.set(DB.K.partner, null); return; }
+      const room = { id: saved.roomId, ...snap.data() };
+      _attachRoom(room);
+    } catch (e) {
+      console.warn('[Share] ルーム復元失敗:', e);
+    }
+  });
 }
 
 // ----------------------------------------------------------------
@@ -409,7 +504,7 @@ function renderCalendar() {
   const cycleDays_limit = 500; // 最大ループ回数
   filteredTasks.forEach(t => {
     const due = nextDue(t);
-    const cycleD = CYCLE_DAYS[t.cycle];
+    const cycleD = getCycleDays(t);
     const color  = getGenre(t.genre).color;
 
     // monthStart〜monthEnd の各日が due から cycleD の倍数日後かチェック
@@ -543,8 +638,25 @@ function renderDayPanel(date) {
   if (welcomeEl) welcomeEl.style.display = 'none';
 
   document.getElementById('day-panel-date').textContent = D.jpFull(date);
+  // バナー内の日付も同期
+  const setupDateEl = document.getElementById('setup-banner-date');
+  if (setupDateEl) setupDateEl.textContent = D.jpFull(date);
 
   const tasks  = DB.get(DB.K.tasks);
+
+  // タスクがファーストタスクのみ（1件以下）の場合、設定促進バナーを表示
+  const setupBannerEl = document.getElementById('cal-setup-banner');
+  const onlyFirstTask = tasks.length <= 1 && (tasks.length === 0 || tasks[0]._isFirst);
+  if (setupBannerEl) {
+    if (onlyFirstTask) {
+      setupBannerEl.style.display = '';
+      dayPanel.style.display = 'none';  // バナー表示中はday-panelを隠す
+    } else {
+      setupBannerEl.style.display = 'none';
+      dayPanel.style.display = '';
+    }
+  }
+
   const filteredTasks = calGenreFilter === 'all' ? tasks : tasks.filter(t => t.genre === calGenreFilter);
 
   // tasks due on this date
@@ -552,7 +664,7 @@ function renderDayPanel(date) {
     const due = nextDue(t);
     if (due > date) return false;
     const d = D.diff(date, due);
-    return d >= 0 && d % CYCLE_DAYS[t.cycle] === 0;
+    return d >= 0 && d % getCycleDays(t) === 0;
   });
 
   const listEl = document.getElementById('day-task-list');
@@ -582,7 +694,7 @@ function renderDayPanel(date) {
       </div>
       <div class="day-task-body">
         <div class="day-task-name ${done ? 'done-text' : ''}">${t.name}</div>
-        <div class="day-task-sub">${g.label}・<span class="pill ${CYCLE_PILL[t.cycle]}">${CYCLE_LABELS[t.cycle]}</span>・${DIFF_LABELS[t.diff]}</div>
+        <div class="day-task-sub">${g.label}・<span class="pill ${CYCLE_PILL[t.cycle] || 'pill-custom'}">${getCycleLabel(t)}</span>・${DIFF_LABELS[t.diff]}</div>
       </div>
       <div class="day-task-check ${done ? 'done' : ''}">
         ${done ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>` : ''}
@@ -930,7 +1042,7 @@ function buildSuggestHtml(suggestions) {
           <path d="M10 6v4l2.5 2.5" stroke="#e8a020" stroke-width="1.8" stroke-linecap="round"/>
           <circle cx="10" cy="10" r="1" fill="#e8a020"/>
         </svg>
-        <span>AIからの提案</span>
+        <span>かくさんからの提案</span>
         <span class="suggest-header-sub">あなたのタスク構成を分析しました</span>
       </div>
       ${suggestions.map(s => {
@@ -943,7 +1055,7 @@ function buildSuggestHtml(suggestions) {
           <div class="suggest-card-body">
             <div class="suggest-card-name">${s.name}</div>
             <div class="suggest-card-meta">
-              <span class="pill ${CYCLE_PILL[s.cycle]}">${CYCLE_LABELS[s.cycle]}</span>
+              <span class="pill ${CYCLE_PILL[s.cycle] || 'pill-custom'}">${getCycleLabel(s)}</span>
               <span style="font-size:11px;color:var(--muted);">${DIFF_LABELS[s.diff]}</span>
             </div>
             <div class="suggest-card-reason">${s.reason}</div>
@@ -961,6 +1073,7 @@ function renderTaskList() {
   const tasks = DB.get(DB.K.tasks);
   const today = D.today();
   const cleared = isFirstTaskCleared();
+  const taskMap = Object.fromEntries(tasks.map(t => [t.id, t]));
 
   // ファーストタスク未完了時はロック画面を表示
   const bodyEl = document.getElementById('task-list-body');
@@ -1079,7 +1192,7 @@ function renderTaskList() {
             <div class="task-item-body">
               <div class="task-item-name">${t.name}</div>
               <div class="task-item-meta">
-                <span class="pill ${CYCLE_PILL[t.cycle]}">${CYCLE_LABELS[t.cycle]}</span>
+                <span class="pill ${CYCLE_PILL[t.cycle] || 'pill-custom'}">${getCycleLabel(t)}</span>
                 <span>${DIFF_LABELS[t.diff]}</span>
                 <span class="task-item-next ${nextCls}">${nextTxt}</span>
               </div>
@@ -1096,6 +1209,44 @@ function renderTaskList() {
       <div class="divider-bar"></div>`;
     }).join('');
 
+  // 今日完了したタスク一覧セクション
+  let todayDoneHtml = '';
+  if (taskGenreFilter === 'all') {
+    const logs = DB.get(DB.K.logs);
+    const todayLogs = logs.filter(l => l.completedAt === today);
+    if (todayLogs.length > 0) {
+      const doneItems = todayLogs.map(l => {
+        const t = taskMap[l.taskId];
+        if (!t) return '';
+        const g = getGenre(t.genre);
+        return `
+        <div class="today-done-item">
+          <div class="today-done-icon" style="background:${g.bg};">
+            <svg viewBox="0 0 24 24" fill="none" stroke="${g.color}" stroke-width="1.8" width="14" height="14">${g.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
+          </div>
+          <div class="today-done-name">${t.name}</div>
+          <div class="today-done-check">
+            <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" width="11" height="11"><path d="M5 13l4 4L19 7"/></svg>
+          </div>
+        </div>`;
+      }).filter(Boolean).join('');
+
+      todayDoneHtml = `
+      <div class="today-done-section">
+        <div class="today-done-header">
+          <svg viewBox="0 0 20 20" width="16" height="16" fill="none">
+            <circle cx="10" cy="10" r="8" fill="#d4f0e2"/>
+            <path d="M6 10l3 3 5-5" stroke="#2d6a46" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <span>今日こなしたタスク</span>
+          <span class="today-done-count">${todayLogs.length}件</span>
+        </div>
+        ${doneItems}
+      </div>
+      <div class="divider-bar"></div>`;
+    }
+  }
+
   // AI提案カードを末尾に追加（すべて表示時のみ）
   let suggestHtml = '';
   if (taskGenreFilter === 'all') {
@@ -1105,7 +1256,7 @@ function renderTaskList() {
     }
   }
 
-  bodyEl.innerHTML = sections + suggestHtml;
+  bodyEl.innerHTML = todayDoneHtml + sections + suggestHtml;
 }
 
 // ----------------------------------------------------------------
@@ -1256,17 +1407,34 @@ function renderPeriod() {
   const allDays = DB.get(DB.K.period_days).sort((a,b) => b.date.localeCompare(a.date));
   const logEl = document.getElementById('period-log-list');
 
-  // パートナーデータ表示
-  const partner = getPartnerData();
-  const partnerSection = partner ? `
-    <div style="padding:12px 18px; background:var(--lavender-lt); border-bottom:1px solid var(--border);">
-      <div style="font-size:12px;font-weight:700;color:var(--lavender);margin-bottom:4px;">
-        パートナーの記録（${partner.sharedAt}共有）
+  // パートナービュー（接続中のみ表示）
+  const connected = isPartnerConnected();
+  const partnerSection = connected ? (
+    _partnerPeriodDays.length ? `
+    <div class="partner-period-section">
+      <div class="partner-period-header">
+        <span class="partner-dot"></span>
+        パートナーの記録（リアルタイム同期中）
       </div>
-      <div style="font-size:12px;color:var(--ink2);">
-        ${partner.period_days.length}日分の記録を受信済み
+      <div class="partner-period-days">
+        ${_partnerPeriodDays
+          .sort((a,b) => b.date.localeCompare(a.date))
+          .slice(0, 10)
+          .map(p => `<div class="partner-period-item">
+            <span style="width:9px;height:9px;border-radius:50%;background:${FLOW_DOT[p.flow]||'#d96b6b'};flex-shrink:0;display:inline-block;"></span>
+            <span class="partner-period-date">${D.jpShort(p.date)}</span>
+            <span class="partner-period-flow">${FLOW_JP[p.flow]||'-'}</span>
+            ${p.memo ? `<span class="partner-period-memo">${_escapeHtml(p.memo)}</span>` : ''}
+          </div>`).join('')}
       </div>
-    </div>` : '';
+    </div>` : `
+    <div class="partner-period-section">
+      <div class="partner-period-header">
+        <span class="partner-dot"></span>パートナーの記録（リアルタイム同期中）
+      </div>
+      <div style="font-size:12px;color:var(--muted);padding:6px 0;">パートナーの記録はまだありません</div>
+    </div>`
+  ) : '';
 
   if (!allDays.length) {
     logEl.innerHTML = partnerSection + `<div class="empty-state" style="padding:16px 0 8px;">
@@ -1334,12 +1502,16 @@ function openTaskModal(taskId = null) {
     document.getElementById('input-task-memo').value  = t.memo || '';
     setRadio('input-task-cycle', t.cycle);
     setRadio('input-task-diff',  t.diff);
+    document.getElementById('input-custom-days').value = t.customDays || 3;
+    document.getElementById('custom-days-row').style.display = t.cycle === 'custom' ? 'flex' : 'none';
   } else {
     document.getElementById('input-task-name').value  = '';
     document.getElementById('input-task-genre').value = 'toilet';
     document.getElementById('input-task-memo').value  = '';
     setRadio('input-task-cycle', 'weekly');
     setRadio('input-task-diff',  'easy');
+    document.getElementById('input-custom-days').value = 3;
+    document.getElementById('custom-days-row').style.display = 'none';
   }
   document.getElementById('modal-task').classList.remove('hidden');
 }
@@ -1349,10 +1521,18 @@ function closeTaskModal() { document.getElementById('modal-task').classList.add(
 function saveTask() {
   const name = document.getElementById('input-task-name').value.trim();
   if (!name) { showToast('タスク名を入力してください'); return; }
+  const cycle = getRadio('input-task-cycle');
+  const customDays = cycle === 'custom'
+    ? Math.max(1, Number(document.getElementById('input-custom-days').value) || 1)
+    : undefined;
+  if (cycle === 'custom' && (!customDays || customDays < 1)) {
+    showToast('日数を1以上で入力してください'); return;
+  }
   const payload = {
     name,
     genre: document.getElementById('input-task-genre').value,
-    cycle: getRadio('input-task-cycle'),
+    cycle,
+    ...(cycle === 'custom' ? { customDays } : {}),
     diff:  getRadio('input-task-diff'),
     memo:  document.getElementById('input-task-memo').value.trim(),
   };
@@ -1405,7 +1585,7 @@ function openRecordModal(date) {
         </div>
         <div style="flex:1;">
           <div style="font-size:14px;font-weight:700;">${t.name}</div>
-          <div style="font-size:11px;color:var(--muted);">${g.label}・${CYCLE_LABELS[t.cycle]}</div>
+          <div style="font-size:11px;color:var(--muted);">${g.label}・${getCycleLabel(t)}</div>
         </div>
       </label>`;
     }).join('');
@@ -1462,24 +1642,93 @@ function savePeriod() {
   closePeriodModal();
   renderPeriod(); renderCalendar();
   showToast('記録しました');
+  // パートナーに通知
+  onPeriodUpdated();
+}
+
+// ブラウザ通知（Notification API）
+function showBrowserNotification(title, body) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    new Notification(title, { body, icon: './kakusann.png' });
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') new Notification(title, { body, icon: './kakusann.png' });
+    });
+  }
+}
+
+// 通知許可をリクエスト（共有接続時に呼ぶ）
+function requestNotificationPermission() {
+  if (!('Notification' in window) || Notification.permission === 'granted') return;
+  Notification.requestPermission();
 }
 
 // パートナー共有モーダル
 function openShareModal() {
-  document.getElementById('share-comment-input').value = '';
-  document.getElementById('share-import-input').value = '';
-  document.getElementById('share-url-result').style.display = 'none';
-  document.getElementById('share-received-preview').style.display = 'none';
-  // 送るタブをデフォルト表示
-  document.getElementById('share-panel-send').style.display = '';
-  document.getElementById('share-panel-receive').style.display = 'none';
-  document.getElementById('share-tab-send').style.background = 'var(--rose)';
-  document.getElementById('share-tab-send').style.color = '#fff';
-  document.getElementById('share-tab-receive').style.background = 'var(--white)';
-  document.getElementById('share-tab-receive').style.color = 'var(--muted)';
+  renderShareModalState();
   document.getElementById('modal-share').classList.remove('hidden');
 }
 function closeShareModal() { document.getElementById('modal-share').classList.add('hidden'); }
+
+// 共有モーダルの状態に応じてUIを切り替える
+function renderShareModalState() {
+  const modal = document.getElementById('modal-share');
+  if (!modal) return;
+
+  const connected = isPartnerConnected();
+  const hasRoom   = !!_shareRoom;
+
+  // 各パネル
+  const panelInvite    = document.getElementById('share-panel-invite');
+  const panelConnected = document.getElementById('share-panel-connected');
+
+  if (connected) {
+    panelInvite.style.display    = 'none';
+    panelConnected.style.display = '';
+    renderShareComments();
+  } else if (hasRoom) {
+    // ルームあり・未接続（招待待ち）
+    panelInvite.style.display    = '';
+    panelConnected.style.display = 'none';
+    document.getElementById('share-invite-waiting').style.display = '';
+    document.getElementById('share-invite-form').style.display    = 'none';
+    // 招待URLを再表示
+    const urlEl = document.getElementById('share-invite-url-text');
+    if (urlEl) urlEl.textContent = buildInviteURL(_shareRoom.id);
+  } else {
+    panelInvite.style.display    = '';
+    panelConnected.style.display = 'none';
+    document.getElementById('share-invite-waiting').style.display = 'none';
+    document.getElementById('share-invite-form').style.display    = '';
+  }
+}
+
+// コメント欄を再描画
+function renderShareComments() {
+  const el = document.getElementById('share-comments-list');
+  if (!el) return;
+  const myUid = getUserId();
+  if (!_roomComments.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:12px;padding:16px 0;">まだコメントはありません</div>';
+    return;
+  }
+  el.innerHTML = _roomComments.map(c => {
+    const isMine = c.uid === myUid;
+    const timeStr = c.createdAt?.toDate
+      ? c.createdAt.toDate().toLocaleString('ja-JP', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' })
+      : '';
+    return `<div class="share-comment ${isMine ? 'share-comment-mine' : 'share-comment-theirs'}">
+      <div class="share-comment-text">${_escapeHtml(c.text)}</div>
+      <div class="share-comment-time">${timeStr}</div>
+    </div>`;
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function _escapeHtml(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
 
 // ----------------------------------------------------------------
 // 11. Radio helper
@@ -1673,7 +1922,12 @@ function bindEvents() {
   });
   ['input-task-cycle','input-task-diff'].forEach(gid => {
     document.getElementById(gid).addEventListener('click', e => {
-      const b = e.target.closest('.radio-btn'); if (b) setRadio(gid, b.dataset.val);
+      const b = e.target.closest('.radio-btn'); if (!b) return;
+      setRadio(gid, b.dataset.val);
+      if (gid === 'input-task-cycle') {
+        document.getElementById('custom-days-row').style.display =
+          b.dataset.val === 'custom' ? 'flex' : 'none';
+      }
     });
   });
 
@@ -1742,79 +1996,88 @@ function bindEvents() {
     if (row) openPeriodModal(row.dataset.logDate);
   });
 
-  // パートナー共有
+  // パートナー共有モーダル開閉
   document.getElementById('btn-open-share').addEventListener('click', openShareModal);
   document.getElementById('modal-share-close').addEventListener('click', closeShareModal);
   document.getElementById('modal-share').addEventListener('click', e => {
     if (e.target === document.getElementById('modal-share')) closeShareModal();
   });
-  // タブ切り替え
-  document.getElementById('share-tab-send').addEventListener('click', () => {
-    document.getElementById('share-panel-send').style.display = '';
-    document.getElementById('share-panel-receive').style.display = 'none';
-    document.getElementById('share-tab-send').style.background = 'var(--rose)';
-    document.getElementById('share-tab-send').style.color = '#fff';
-    document.getElementById('share-tab-receive').style.background = 'var(--white)';
-    document.getElementById('share-tab-receive').style.color = 'var(--muted)';
+
+  // 招待リンクを作成
+  let _inviteURL = '';
+  document.getElementById('btn-gen-invite').addEventListener('click', async () => {
+    if (!isLoggedIn()) { showToast('Googleログインが必要です'); openAuthModal('login'); return; }
+    const btn = document.getElementById('btn-gen-invite');
+    btn.disabled = true;
+    btn.textContent = '作成中…';
+    const result = await createInviteLink();
+    btn.disabled = false;
+    btn.textContent = '招待リンクを作成';
+    if (result.error) { showToast(result.error); return; }
+    _inviteURL = result.url;
+    document.getElementById('share-invite-url-text').textContent = _inviteURL;
+    document.getElementById('share-invite-waiting').style.display = '';
+    document.getElementById('share-invite-form').style.display    = 'none';
+    requestNotificationPermission();
   });
-  document.getElementById('share-tab-receive').addEventListener('click', () => {
-    document.getElementById('share-panel-send').style.display = 'none';
-    document.getElementById('share-panel-receive').style.display = '';
-    document.getElementById('share-tab-receive').style.background = 'var(--rose)';
-    document.getElementById('share-tab-receive').style.color = '#fff';
-    document.getElementById('share-tab-send').style.background = 'var(--white)';
-    document.getElementById('share-tab-send').style.color = 'var(--muted)';
-  });
-  // URL生成
-  // 共有リンクを作成 → ボタン群を表示
-  let _shareURL = '';
-  document.getElementById('btn-gen-share-url').addEventListener('click', () => {
-    const comment = document.getElementById('share-comment-input').value.trim();
-    _shareURL = generateShareURL(comment);
-    document.getElementById('share-url-result').style.display = 'flex';
-  });
+
   // LINEで送る
-  document.getElementById('btn-share-line').addEventListener('click', () => {
-    if (!_shareURL) return;
-    const text = 'おうちリズムの生理記録を共有します ' + _shareURL;
+  document.getElementById('btn-invite-line').addEventListener('click', () => {
+    if (!_inviteURL) return;
+    const text = 'おうちリズムで生理記録を共有します。下のURLから参加してね！\n' + _inviteURL;
     window.open('https://line.me/R/msg/text/?' + encodeURIComponent(text), '_blank');
   });
-  // メールで送る
-  document.getElementById('btn-share-email').addEventListener('click', () => {
-    if (!_shareURL) return;
-    const subject = encodeURIComponent('おうちリズム 生理記録の共有');
-    const body = encodeURIComponent('生理記録を共有します。\n下のURLをタップして確認してください。\n\n' + _shareURL);
-    window.location.href = `mailto:?subject=${subject}&body=${body}`;
-  });
+
   // URLコピー
-  document.getElementById('btn-copy-share-url').addEventListener('click', () => {
-    if (!_shareURL) return;
-    navigator.clipboard?.writeText(_shareURL)
-      .then(() => showToast('URLをコピーしました'))
-      .catch(() => { showToast('コピーに失敗しました'); });
-  });
-  // URL取り込み
-  document.getElementById('btn-import-share-code').addEventListener('click', () => {
-    const input = document.getElementById('share-import-input').value.trim();
-    if (!input) { showToast('URLを貼り付けてください'); return; }
-    const data = importShareData(input);
-    if (data) {
-      // 受信データをプレビュー表示
-      const ranges = data.period_days?.length || 0;
-      const comment = data.comment ? `「${data.comment}」` : '';
-      const detail = [
-        comment ? `コメント: ${comment}` : '',
-        `共有日: ${data.sharedAt || '不明'}`,
-        `生理記録: ${ranges}日分`,
-        `平均周期: ${data.cycleLength || 28}日`,
-      ].filter(Boolean).join('<br>');
-      document.getElementById('share-received-detail').innerHTML = detail;
-      document.getElementById('share-received-preview').style.display = '';
-      renderPeriod();
-      showToast('パートナーの記録を取り込みました');
-    } else {
-      showToast('URLが正しくありません');
+  document.getElementById('btn-invite-copy').addEventListener('click', () => {
+    if (!_inviteURL) {
+      // 招待待ちパネルからも呼ばれる場合
+      _inviteURL = document.getElementById('share-invite-url-text')?.textContent || '';
     }
+    if (!_inviteURL) return;
+    navigator.clipboard?.writeText(_inviteURL)
+      .then(() => showToast('URLをコピーしました'))
+      .catch(() => showToast('コピーに失敗しました'));
+  });
+
+  // ルームを解除
+  document.getElementById('btn-leave-room').addEventListener('click', async () => {
+    if (!confirm('パートナーとの共有を解除しますか？')) return;
+    const roomId = getShareRoomId();
+    if (roomId) await leaveShareRoom(roomId);
+    _shareRoom = null;
+    _partnerPeriodDays = [];
+    _roomComments = [];
+    DB.set(DB.K.partner, null);
+    closeShareModal();
+    renderPeriod();
+    showToast('共有を解除しました');
+  });
+
+  // コメント投稿
+  document.getElementById('btn-post-comment').addEventListener('click', async () => {
+    const input = document.getElementById('share-comment-input-new');
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    await postComment(getShareRoomId(), text);
+    // リスナーが自動更新するので renderShareComments は不要
+  });
+  // Enterキーでも投稿
+  document.getElementById('share-comment-input-new').addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('btn-post-comment').click();
+    }
+  });
+
+  // タスク設定促進バナーのボタン → タスク追加モーダルを開く
+  document.getElementById('btn-setup-task')?.addEventListener('click', () => {
+    openTaskModal();
+  });
+  // バナー内の「完了を記録」ボタン → 記録モーダルを開く
+  document.getElementById('btn-setup-record-done')?.addEventListener('click', () => {
+    openRecordModal(calSelectedDate);
   });
 
   // settings
@@ -1959,37 +2222,50 @@ function buildSplashActivity() {
 
 // 時間帯別SVGアイコンHTML（絵文字不使用）
 const SPLASH_ICONS = {
-  night: `<svg viewBox="0 0 48 48" width="52" height="52" fill="none">
-    <circle cx="24" cy="24" r="20" fill="#e8eaf6"/>
-    <path d="M30 12a14 14 0 01-14 22 14 14 0 1014-22z" fill="#7986cb"/>
-    <circle cx="20" cy="16" r="1.5" fill="#fff" opacity=".7"/>
-    <circle cx="34" cy="20" r="1" fill="#fff" opacity=".5"/>
-    <circle cx="32" cy="10" r="1" fill="#fff" opacity=".6"/>
+  // 深夜（0〜4時）：月と星
+  night: `<svg viewBox="0 0 96 96" width="100" height="100" fill="none">
+    <circle cx="48" cy="48" r="44" fill="#e8eaf6"/>
+    <path d="M58 22a28 28 0 01-28 44 28 28 0 1028-44z" fill="#7986cb"/>
+    <circle cx="40" cy="30" r="3" fill="#fff" opacity=".75"/>
+    <circle cx="68" cy="38" r="2" fill="#fff" opacity=".55"/>
+    <circle cx="64" cy="20" r="2" fill="#fff" opacity=".65"/>
+    <circle cx="30" cy="55" r="1.5" fill="#fff" opacity=".4"/>
+    <circle cx="72" cy="58" r="1.5" fill="#fff" opacity=".45"/>
   </svg>`,
-  morning: `<svg viewBox="0 0 48 48" width="52" height="52" fill="none">
-    <circle cx="24" cy="24" r="12" fill="#fdd835"/>
-    <g stroke="#fdd835" stroke-width="2.5" stroke-linecap="round">
-      <line x1="24" y1="6" x2="24" y2="10"/>
-      <line x1="24" y1="38" x2="24" y2="42"/>
-      <line x1="6" y1="24" x2="10" y2="24"/>
-      <line x1="38" y1="24" x2="42" y2="24"/>
-      <line x1="11" y1="11" x2="14" y2="14"/>
-      <line x1="34" y1="34" x2="37" y2="37"/>
-      <line x1="37" y1="11" x2="34" y2="14"/>
-      <line x1="14" y1="34" x2="11" y2="37"/>
+  // 朝（5〜9時）：太陽と光線
+  morning: `<svg viewBox="0 0 96 96" width="100" height="100" fill="none">
+    <circle cx="48" cy="48" r="44" fill="#fffde7"/>
+    <circle cx="48" cy="48" r="20" fill="#fdd835"/>
+    <circle cx="48" cy="48" r="16" fill="#ffee58"/>
+    <g stroke="#fdd835" stroke-width="4" stroke-linecap="round">
+      <line x1="48" y1="10" x2="48" y2="20"/>
+      <line x1="48" y1="76" x2="48" y2="86"/>
+      <line x1="10" y1="48" x2="20" y2="48"/>
+      <line x1="76" y1="48" x2="86" y2="48"/>
+      <line x1="21" y1="21" x2="28" y2="28"/>
+      <line x1="68" y1="68" x2="75" y2="75"/>
+      <line x1="75" y1="21" x2="68" y2="28"/>
+      <line x1="28" y1="68" x2="21" y2="75"/>
     </g>
   </svg>`,
-  day: `<svg viewBox="0 0 48 48" width="52" height="52" fill="none">
-    <ellipse cx="24" cy="30" rx="12" ry="6" fill="#a5d6a7" opacity=".5"/>
-    <path d="M24 8C18 8 13 13 13 20c0 5 3 9 7 11h8c4-2 7-6 7-11 0-7-5-12-11-12z" fill="#66bb6a"/>
-    <path d="M24 8 Q22 16 24 22" stroke="#388e3c" stroke-width="1.5" stroke-linecap="round"/>
-    <path d="M24 14 Q28 17 29 22" stroke="#388e3c" stroke-width="1.2" stroke-linecap="round"/>
+  // 昼（10〜16時）：青空と雲
+  day: `<svg viewBox="0 0 96 96" width="100" height="100" fill="none">
+    <circle cx="48" cy="48" r="44" fill="#e3f2fd"/>
+    <circle cx="48" cy="38" r="14" fill="#ffee58"/>
+    <ellipse cx="36" cy="58" rx="16" ry="10" fill="#fff"/>
+    <ellipse cx="54" cy="62" rx="20" ry="12" fill="#fff"/>
+    <ellipse cx="70" cy="60" rx="13" ry="9" fill="#fff"/>
+    <ellipse cx="36" cy="58" rx="12" ry="8" fill="#f5f5f5"/>
+    <ellipse cx="54" cy="62" rx="16" ry="10" fill="#fafafa"/>
   </svg>`,
-  evening: `<svg viewBox="0 0 48 48" width="52" height="52" fill="none">
-    <rect width="48" height="48" rx="24" fill="#fff3e0"/>
-    <circle cx="24" cy="20" r="10" fill="#ffb74d"/>
-    <path d="M4 30 Q12 22 24 26 Q36 30 44 22" stroke="#ff8f00" stroke-width="2" fill="none"/>
-    <path d="M4 34 Q12 26 24 30 Q36 34 44 26" stroke="#ffa726" stroke-width="1.5" fill="none" opacity=".6"/>
+  // 夕方（17〜23時）：夕焼け空
+  evening: `<svg viewBox="0 0 96 96" width="100" height="100" fill="none">
+    <circle cx="48" cy="48" r="44" fill="#fff3e0"/>
+    <circle cx="48" cy="42" r="18" fill="#ffb74d"/>
+    <circle cx="48" cy="42" r="14" fill="#ffa726"/>
+    <path d="M8 62 Q24 50 48 56 Q72 62 88 50" stroke="#ff8f00" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+    <path d="M8 70 Q24 58 48 64 Q72 70 88 58" stroke="#ffa726" stroke-width="2.5" fill="none" stroke-linecap="round" opacity=".7"/>
+    <path d="M8 78 Q24 66 48 72 Q72 78 88 66" stroke="#ffcc02" stroke-width="2" fill="none" stroke-linecap="round" opacity=".45"/>
   </svg>`,
 };
 
@@ -2131,15 +2407,25 @@ function bindUnlockEvents() {
 // 18. PWA
 // ----------------------------------------------------------------
 if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+  window.addEventListener('load', () => {
+    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
+      // ローカル開発中はキャッシュを使わないよう SW を全解除
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(reg => reg.unregister());
+      });
+    } else {
+      navigator.serviceWorker.register('./sw.js').catch(() => {});
+    }
+  });
 }
 
 // ----------------------------------------------------------------
-// 17. 起動
+// 19. 起動
 // ----------------------------------------------------------------
 initData();
 bindEvents();
 bindUnlockEvents();
+bindAuthEvents();
 
 // PC用ボタンのイベントをbindEventsの後に追加
 document.getElementById('btn-add-task-pc').addEventListener('click', () => openTaskModal());
@@ -2154,11 +2440,20 @@ checkShareURLOnLoad();
 
 switchScreen('calendar');
 
-// 今日初回起動時のスプラッシュ
-showSplash();
+// Firebase / Cloud 初期化（initAuth 内で initializeApp → initFirestore の順に実行される）
+initAuth();
+
+// ログイン状態が確定してからスプラッシュ表示
+onAuthReady(async user => {
+  if (user) {
+    await onUserSignedIn(user);
+  }
+  // 今日初回起動時のスプラッシュ
+  showSplash();
+});
 
 // ----------------------------------------------------------------
-// フローティングキャラクター（おにぎりくん）
+// フローティングキャラクター（かくさん）
 // ----------------------------------------------------------------
 (function initCharaFloat() {
   const bubbleEl = document.getElementById('chara-bubble');
@@ -2174,28 +2469,48 @@ showSplash();
       'こんにちは〜！\nいっしょにがんばろ！',
       'ちょっと休んでね〜',
       'タップしてみてね！',
+      // かくさん自身の話
+      'わたし、かくさんっていうの。\nよろしくね！',
+      'かくさんはね、\nきれいなおうちが大好きなんだ',
+      'じつはわたし、\nほこりが一番のてき…！',
+      'おうちがきれいだと\nわたしも元気が出るよ！',
+      'わたし、掃除してる人を\nみるのが一番すき〜！',
     ],
     overdue: [
       'ちょっとだけ\n遅れてるよ…大丈夫！',
       'すこしずつで\nOKだよ！',
       'できるときに\nやってみよう！',
+      // かくさん自身の話
+      'かくさんも\n苦手なことあるよ。\nいっしょに少しずつね！',
     ],
     doneToday: [
       'えらい！えらいよ〜！',
       '今日もできたね！\nすごい！',
       'きれいなおうち、\n気持ちいいね！',
+      // かくさん自身の話
+      'わたし、うれしくて\nくるくるしちゃうよ〜！',
+      'かくさん感動した…！\nほんとにえらすぎ！',
     ],
     streak: [
       '連続記録中！\nすごすぎる！',
       'この調子だよ〜！',
+      // かくさん自身の話
+      'わたし、こんな人に\nそばにいてほしかったんだ！',
+      'かくさん、もうファンになったよ！',
     ],
     morning: [
       'おはよう！\n今日もいいお天気だね',
       'きょうも\nいちにちがんばろ！',
+      // かくさん自身の話
+      'かくさんは朝が\n一番テンション上がるんだ！',
+      'おはよう〜！\nかくさんも起きたてだよ',
     ],
     night: [
       'おつかれさま〜\nゆっくり休んでね',
       'きょうも\nえらかったよ！',
+      // かくさん自身の話
+      'かくさんも\nもうねむいよ〜…',
+      'ゆっくり寝てね。\nかくさんがおうち見てるよ！',
     ],
   };
 
@@ -2246,10 +2561,26 @@ showSplash();
   // 画面切り替え時に一言
   document.addEventListener('screenChanged', e => {
     const screenMsgs = {
-      calendar: ['カレンダーだよ！\n今日の予定は？', 'きょうはなにする？'],
-      tasks:    ['タスク一覧だよ！\nこなせたらえらい！', 'まずは1個から！'],
-      period:   ['からだの記録\nちゃんとつけてえらい！', 'じぶんを大切にね！'],
-      settings: ['設定画面だよ！\nカスタマイズしてね', 'おうちに合わせてね！'],
+      calendar: [
+        'カレンダーだよ！\n今日の予定は？',
+        'きょうはなにする？',
+        'かくさんと一緒に\nリズム作ろうね！',
+      ],
+      tasks: [
+        'タスク一覧だよ！\nこなせたらえらい！',
+        'まずは1個から！',
+        'かくさん、全部\n応援してるよ〜！',
+      ],
+      period: [
+        'からだの記録\nちゃんとつけてえらい！',
+        'じぶんを大切にね！',
+        'かくさんも心配して\nみてるからね…！',
+      ],
+      settings: [
+        '設定画面だよ！\nカスタマイズしてね',
+        'おうちに合わせてね！',
+        'かくさんの設定も\nここにあるよ〜',
+      ],
     };
     const msgs = screenMsgs[e.detail];
     if (msgs) setTimeout(() => showBubble(pickRandom(msgs), 2800), 400);
@@ -2261,6 +2592,9 @@ showSplash();
       'やった！えらい〜！！',
       'できたね！すごい！',
       'ひとつ片付いた！\nえらすぎ！',
+      // かくさん自身の話
+      'かくさん、感激して\nるよ…！！',
+      'わたし、ずっと\n見てたよ！えらい！',
     ];
     showBubble(pickRandom(cheerMsgs), 3000);
   });

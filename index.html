@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="おうちリズム">
   <meta name="theme-color" content="#4caf7d">
@@ -42,6 +43,28 @@
 
   <!-- ウェルカムパネル（ファーストタスク未完了時に表示） -->
   <div id="cal-welcome-panel" style="display:none;"></div>
+
+  <!-- タスク設定促進バナー（チュートリアル完了後、タスク未設定時に表示） -->
+  <div id="cal-setup-banner" class="cal-setup-banner" style="display:none;">
+    <!-- 日付 & 記録ボタン -->
+    <div class="day-panel-header cal-setup-banner-header">
+      <div class="day-panel-date" id="setup-banner-date"></div>
+      <button class="day-panel-add" id="btn-setup-record-done">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
+        完了を記録
+      </button>
+    </div>
+    <div class="cal-setup-banner-inner">
+      <div class="cal-setup-banner-chara">
+        <img src="kakusann.png" alt="かくさん" class="cal-setup-chara-img">
+      </div>
+      <div class="cal-setup-banner-body">
+        <div class="cal-setup-banner-title">タスクを設定しませんか？</div>
+        <div class="cal-setup-banner-desc">自分だけの家事リズムをつくろう！<br>タスクを追加するとカレンダーに反映されます。</div>
+        <button class="cal-setup-banner-btn" id="btn-setup-task">タスクを追加する</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Day detail panel（ファーストタスク完了後に表示） -->
   <div class="day-panel">
@@ -169,6 +192,11 @@
     <div class="pc-page-header-title">設定</div>
   </div>
 
+  <!-- アカウント -->
+  <div class="setting-section-header">アカウント・同期</div>
+  <div id="auth-account-area" style="padding:12px 18px 14px;"></div>
+
+  <div class="divider-bar"></div>
   <div class="setting-section-header">住まい・掃除レベル</div>
   <div class="setting-row">
     <div><div class="setting-label">住居タイプ</div></div>
@@ -217,7 +245,7 @@
     <button class="btn-danger" id="btn-reset">全データをリセット</button>
   </div>
   <div style="padding:16px 18px 32px; font-size:12px; color:var(--muted); line-height:1.8;">
-    データはすべてこのデバイスのブラウザに保存されます。外部サーバーへの送信は行いません。
+    ログインするとデータがクラウドに保存され、PCとスマホで自動同期されます。
   </div>
 </div>
 
@@ -301,7 +329,15 @@
         <button class="radio-btn" data-val="monthly">月1</button>
         <button class="radio-btn" data-val="season">3ヶ月</button>
         <button class="radio-btn" data-val="yearly">年1</button>
+        <button class="radio-btn" data-val="custom">〇日ごと</button>
       </div>
+    </div>
+    <div id="custom-days-row" style="display:none; align-items:center; gap:8px; padding:4px 0 8px;">
+      <label class="form-label" style="margin:0; white-space:nowrap;">日数</label>
+      <input type="number" id="input-custom-days" class="setting-input"
+        min="1" max="999" value="3"
+        style="width:80px; text-align:center;">
+      <span style="font-size:13px; color:var(--muted);">日ごとに実施</span>
     </div>
     <div class="form-group">
       <label class="form-label">難易度</label>
@@ -385,81 +421,76 @@
      MODAL: パートナー共有
      ================================================================ -->
 <div class="modal-overlay hidden" id="modal-share">
-  <div class="modal">
+  <div class="modal auth-modal">
     <div class="modal-handle"></div>
     <div class="modal-title">
-      <div style="font-size:15px;font-weight:800;color:var(--g800);">パートナーと共有</div>
+      <div style="font-size:15px;font-weight:800;color:var(--rose);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="display:inline;vertical-align:-2px;margin-right:4px;"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z"/></svg>
+        パートナーと共有
+      </div>
       <button class="modal-close" id="modal-share-close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
       </button>
     </div>
 
-    <!-- タブ切り替え -->
-    <div style="display:flex;gap:0;margin-bottom:16px;border:1.5px solid var(--border);border-radius:10px;overflow:hidden;">
-      <button id="share-tab-send" class="share-tab active" style="flex:1;padding:9px;font-size:13px;font-weight:700;background:var(--rose);color:#fff;border:none;cursor:pointer;">
-        送る
-      </button>
-      <button id="share-tab-receive" class="share-tab" style="flex:1;padding:9px;font-size:13px;font-weight:700;background:var(--white);color:var(--muted);border:none;cursor:pointer;">
-        受け取る
-      </button>
+    <!-- 招待パネル（未接続時） -->
+    <div id="share-panel-invite">
+
+      <!-- フォーム（まだルームなし） -->
+      <div id="share-invite-form">
+        <div class="share-info-note">
+          パートナーに招待リンクを送ることで、生理記録をリアルタイムで共有できます。<br>
+          お互いにコメントも残せます。
+        </div>
+        <button class="btn-primary share-btn-rose" id="btn-gen-invite">招待リンクを作成</button>
+      </div>
+
+      <!-- 招待待ち（ルームあり・パートナー未参加） -->
+      <div id="share-invite-waiting" style="display:none;">
+        <div class="share-waiting-badge">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+          パートナーの参加を待っています…
+        </div>
+        <div class="share-info-note" style="margin-top:10px;">下のURLをパートナーに送ってください</div>
+        <div class="share-url-box" id="share-invite-url-text"></div>
+        <div class="share-action-row">
+          <button class="share-btn-line" id="btn-invite-line">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 3.07 1.6 5.78 4.08 7.53L5.5 22l3.7-1.93C10.3 20.65 11.14 21 12 21c5.52 0 10-4.03 10-9s-4.48-9-10-9z"/></svg>
+            LINEで送る
+          </button>
+          <button class="share-btn-copy" id="btn-invite-copy">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
+            URLをコピー
+          </button>
+        </div>
+      </div>
     </div>
 
-    <!-- 送る -->
-    <div id="share-panel-send">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
-        一言コメントを添えて、メールまたはLINEでパートナーに送れます。
-      </div>
-      <div class="form-group">
-        <label class="form-label">コメント（任意）</label>
-        <input type="text" class="form-input" id="share-comment-input"
-          placeholder="「今月しんどかった」など一言メモ"
-          style="width:100%;padding:10px 12px;border:1.5px solid var(--border);border-radius:10px;font-size:13px;box-sizing:border-box;">
-      </div>
-      <!-- 送る方法ボタン群 -->
-      <div id="share-url-result" style="display:none; flex-direction:column; gap:8px;">
-        <button id="btn-share-line" style="
-          display:flex;align-items:center;justify-content:center;gap:8px;
-          width:100%;padding:12px;border-radius:12px;border:none;cursor:pointer;
-          background:#06C755;color:#fff;font-size:14px;font-weight:700;">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 3.07 1.6 5.78 4.08 7.53L5.5 22l3.7-1.93C10.3 20.65 11.14 21 12 21c5.52 0 10-4.03 10-9s-4.48-9-10-9zm-3.5 11H7v-4.5h1.5V13zm2.75 0h-1.5v-4.5h1.5V13zm2.75 0h-1.5v-4.5H14V13z"/></svg>
-          LINEで送る
-        </button>
-        <button id="btn-share-email" style="
-          display:flex;align-items:center;justify-content:center;gap:8px;
-          width:100%;padding:12px;border-radius:12px;border:none;cursor:pointer;
-          background:var(--rose);color:#fff;font-size:14px;font-weight:700;">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
-          メールで送る
-        </button>
-        <button id="btn-copy-share-url" style="
-          display:flex;align-items:center;justify-content:center;gap:8px;
-          width:100%;padding:12px;border-radius:12px;cursor:pointer;
-          background:var(--white);color:var(--ink2);font-size:13px;font-weight:600;
-          border:1.5px solid var(--border);">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg>
-          URLをコピー
-        </button>
-      </div>
-      <button class="btn-primary" id="btn-gen-share-url" style="background:var(--rose);border-color:var(--rose);margin-top:4px;">
-        共有リンクを作成
-      </button>
-    </div>
+    <!-- 接続済みパネル -->
+    <div id="share-panel-connected" style="display:none;">
 
-    <!-- 受け取る -->
-    <div id="share-panel-receive" style="display:none;">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.7;">
-        パートナーから受け取ったURLを貼り付けてください。<br>生理記録とコメントを閲覧できます。
+      <!-- 接続状態バッジ -->
+      <div class="share-connected-badge">
+        <span class="share-dot-online"></span>
+        パートナーと接続中 · リアルタイム同期
       </div>
-      <div class="form-group">
-        <textarea class="form-textarea" id="share-import-input" placeholder="共有URLを貼り付け"
-          style="font-size:12px;height:70px;"></textarea>
-        <button class="btn-secondary" id="btn-import-share-code" style="margin-top:6px;width:100%;">取り込む</button>
+
+      <!-- コメント一覧 -->
+      <div class="share-comments-wrap">
+        <div class="share-comments-list" id="share-comments-list"></div>
       </div>
-      <!-- 受信データ表示 -->
-      <div id="share-received-preview" style="display:none;margin-top:8px;padding:12px;background:var(--rose-lt);border-radius:12px;">
-        <div style="font-size:12px;font-weight:700;color:var(--rose);margin-bottom:6px;">受信した記録</div>
-        <div id="share-received-detail" style="font-size:13px;color:var(--ink2);line-height:1.8;"></div>
+
+      <!-- コメント入力 -->
+      <div class="share-comment-input-row">
+        <input type="text" class="share-comment-input-new" id="share-comment-input-new"
+          placeholder="コメントを入力…" autocomplete="off">
+        <button class="share-comment-send-btn" id="btn-post-comment">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="16" height="16"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
       </div>
+
+      <!-- 解除ボタン -->
+      <button class="share-btn-leave" id="btn-leave-room">共有を解除する</button>
     </div>
 
   </div>
@@ -523,10 +554,8 @@
     <!-- 浮遊パーティクル -->
     <div class="splash-particles" id="splash-particles"></div>
 
-    <!-- キャラクター画像 -->
-    <div class="splash-icon" id="splash-icon">
-      <img src="charactar.jpg" alt="おにぎりくん" class="splash-chara-img">
-    </div>
+    <!-- 時間帯アイコン -->
+    <div class="splash-time-icon" id="splash-icon"></div>
 
     <!-- 挨拶 -->
     <div class="splash-greeting" id="splash-greeting">おかえり</div>
@@ -542,10 +571,127 @@
 <!-- フローティングキャラクター -->
 <div id="chara-float" class="chara-float">
   <div class="chara-bubble" id="chara-bubble"></div>
-  <img src="charactar.jpg" alt="おにぎりくん" class="chara-float-img" id="chara-float-img">
+  <img src="kakusann.png" alt="かくさん" class="chara-float-img" id="chara-float-img">
 </div>
 
 </div><!-- #app -->
+
+<!-- ================================================================
+     同期ステータスバー
+     ================================================================ -->
+<div id="sync-status" class="sync-status-bar" style="display:none;"></div>
+
+<!-- ================================================================
+     認証モーダル
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-auth">
+  <div class="modal auth-modal">
+    <div class="modal-handle"></div>
+
+    <!-- ヘッダー：キャラ＋タイトル -->
+    <div class="auth-header">
+      <img src="kakusann.png" alt="かくさん" class="auth-chara-img">
+      <div class="auth-header-text">
+        <div class="auth-header-title">おうちリズム</div>
+        <div class="auth-header-sub">家事をたのしく、毎日つづける</div>
+      </div>
+      <button class="modal-close auth-close-btn" id="modal-auth-close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+
+    <!-- タブ -->
+    <div class="auth-tabs">
+      <button class="auth-tab active" id="auth-tab-login">ログイン</button>
+      <button class="auth-tab" id="auth-tab-register">新規登録</button>
+      <button class="auth-tab" id="auth-tab-reset">パスワード再設定</button>
+    </div>
+
+    <!-- ログインパネル -->
+    <div id="auth-panel-login">
+      <!-- Google -->
+      <button class="btn-google" id="btn-google-login">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Googleでログイン
+      </button>
+
+      <div class="auth-divider"><span>または</span></div>
+
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input type="email" class="form-input" id="auth-login-email" placeholder="example@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード</label>
+        <input type="password" class="form-input" id="auth-login-password" placeholder="6文字以上" autocomplete="current-password">
+      </div>
+      <div id="auth-error-login" class="auth-error" style="display:none;"></div>
+      <button class="btn-primary" id="btn-email-login">ログイン</button>
+
+      <div class="auth-links">
+        <a href="#" id="auth-link-reset">パスワードをお忘れの方</a>
+        ·
+        <a href="#" id="auth-link-register">アカウントを作成</a>
+      </div>
+
+      <div class="auth-divider"><span>または</span></div>
+      <button class="btn-secondary auth-anon-btn" id="btn-anon-login">アカウントなしで使う</button>
+      <div class="auth-anon-note">
+        ※データはこのデバイスにのみ保存されます。後から登録も可能です。
+      </div>
+    </div>
+
+    <!-- 新規登録パネル -->
+    <div id="auth-panel-register" style="display:none;">
+      <button class="btn-google" id="btn-google-register">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+        Googleで登録
+      </button>
+
+      <div class="auth-divider"><span>または</span></div>
+
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input type="email" class="form-input" id="auth-register-email" placeholder="example@email.com" autocomplete="email">
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード（6文字以上）</label>
+        <input type="password" class="form-input" id="auth-register-password" placeholder="6文字以上" autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label class="form-label">パスワード（確認）</label>
+        <input type="password" class="form-input" id="auth-register-confirm" placeholder="もう一度入力" autocomplete="new-password">
+      </div>
+      <div id="auth-error-register" class="auth-error" style="display:none;"></div>
+      <button class="btn-primary" id="btn-email-register">登録する</button>
+      <div class="auth-links"><a href="#" class="auth-link-login">ログインに戻る</a></div>
+    </div>
+
+    <!-- パスワードリセットパネル -->
+    <div id="auth-panel-reset" style="display:none;">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7;">
+        登録済みのメールアドレスにパスワード再設定メールを送ります。
+      </div>
+      <div class="form-group">
+        <label class="form-label">メールアドレス</label>
+        <input type="email" class="form-input" id="auth-reset-email" placeholder="example@email.com" autocomplete="email">
+      </div>
+      <div id="auth-error-reset" class="auth-error" style="display:none;"></div>
+      <button class="btn-primary" id="btn-send-reset">リセットメールを送る</button>
+      <div class="auth-links"><a href="#" class="auth-link-login">ログインに戻る</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- Firebase SDK (compat v9) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<!-- アプリスクリプト（読み込み順序が重要） -->
+<script src="firebase-config.js"></script>
+<script src="db-cloud.js"></script>
+<script src="auth.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

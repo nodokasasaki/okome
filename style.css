@@ -372,6 +372,7 @@ html, body {
 .pill-monthly  { background: var(--sky-lt);       color: var(--sky); }
 .pill-season   { background: var(--g200);         color: var(--g700); }
 .pill-yearly   { background: var(--lavender-lt);  color: var(--lavender); }
+.pill-custom   { background: var(--teal-lt);       color: var(--teal); }
 
 /* ================================================================
    ===  PERIOD SCREEN  ===
@@ -814,6 +815,7 @@ svg { display: block; }
     max-height: 88vh;
     padding: 28px 28px 32px;
   }
+  .auth-modal { max-width: 420px; }
   .modal-handle { display: none; }
 
   /* Toast */
@@ -907,14 +909,16 @@ svg { display: block; }
   animation: particle-rise 2.4s ease-out forwards;
 }
 
-/* アイコン */
-.splash-icon {
-  font-size: 52px; line-height: 1;
-  margin-bottom: 12px;
-  display: inline-block;
+/* 時間帯SVGアイコン（ポップアップのメインビジュアル） */
+.splash-time-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
   animation: splash-icon-pop .7s cubic-bezier(.22,.9,.36,1) .3s both,
              splash-float 3.2s ease-in-out 1.2s infinite;
 }
+.splash-time-icon:empty { display: none; }
 
 /* 挨拶 */
 .splash-greeting {
@@ -972,6 +976,87 @@ svg { display: block; }
 .splash-close:active { opacity: .85; transform: scale(.98); }
 
 /* ================================================================
+   SETUP BANNER（チュートリアル完了後・タスク未設定時）
+   ================================================================ */
+.cal-setup-banner {
+  padding: 0 0 6px;
+  display: flex;
+  flex-direction: column;
+}
+.cal-setup-banner-inner {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: linear-gradient(135deg, var(--g100) 0%, var(--g50) 100%);
+  border: 1.5px solid var(--g300);
+  border-radius: var(--r);
+  padding: 16px 16px 16px 14px;
+  box-shadow: var(--sh1);
+  margin: 0 14px;
+}
+.cal-setup-banner-chara {
+  flex-shrink: 0;
+}
+.cal-setup-chara-img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 50%;
+  border: 2.5px solid var(--g300);
+  display: block;
+}
+.cal-setup-banner-body {
+  flex: 1;
+  min-width: 0;
+}
+.cal-setup-banner-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--g800);
+  margin-bottom: 4px;
+}
+.cal-setup-banner-desc {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+.cal-setup-banner-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--g500);
+  color: var(--white);
+  border: none;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  box-shadow: 0 2px 8px rgba(76,175,125,.35);
+  transition: opacity .15s, transform .1s;
+}
+.cal-setup-banner-btn:active { opacity: .85; transform: scale(.97); }
+
+/* バナー内ヘッダー（日付 + 記録ボタン）の余白調整 */
+.cal-setup-banner-header {
+  padding: 14px 14px 12px;
+  margin-bottom: 0;
+}
+
+/* PC */
+@media (min-width: 768px) {
+  .cal-setup-banner { padding: 0 0 8px; }
+  .cal-setup-banner-inner { margin: 0 18px; }
+  .cal-setup-banner-header { padding: 18px 18px 14px; }
+  .cal-setup-chara-img { width: 72px; height: 72px; }
+  .cal-setup-banner-title { font-size: 15px; }
+  .cal-setup-banner-desc  { font-size: 13px; }
+}
+
+/* ================================================================
    WELCOME PANEL（ファーストタスク未完了時）
    ================================================================ */
 #cal-welcome-panel {
@@ -1024,6 +1109,52 @@ svg { display: block; }
 }
 .tasks-locked-desc {
   font-size: 13px; color: var(--muted); line-height: 1.8;
+}
+
+/* ================================================================
+   今日こなしたタスク
+   ================================================================ */
+.today-done-section {
+  margin-bottom: 4px;
+}
+.today-done-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 14px 18px 8px;
+  font-size: 13px; font-weight: 800; color: var(--g700);
+}
+.today-done-count {
+  font-size: 11px; font-weight: 700; color: var(--muted);
+  margin-left: auto;
+}
+.today-done-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 18px;
+  background: var(--g50);
+  border-bottom: 1px solid var(--g100);
+}
+.today-done-icon {
+  width: 24px; height: 24px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.today-done-name {
+  flex: 1; min-width: 0;
+  font-size: 13px; font-weight: 600;
+  text-decoration: line-through;
+  color: var(--muted);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.today-done-check {
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--g500);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+/* PC */
+@media (min-width: 768px) {
+  .today-done-header { padding: 16px 32px 8px; }
+  .today-done-item   { padding: 6px 32px; }
 }
 
 /* ================================================================
@@ -1169,19 +1300,22 @@ svg { display: block; }
 }
 
 /* ================================================================
-   キャラクター（おにぎりくん）
+   キャラクター（かくさん）
    ================================================================ */
 
 /* Splash内のキャラ画像 */
 .splash-chara-img {
-  width: 80px;
-  height: 80px;
+  width: 110px;
+  height: 110px;
   object-fit: cover;
   object-position: center top;
   border-radius: 50%;
-  border: 3px solid var(--g200);
-  box-shadow: 0 4px 16px rgba(30,80,50,.15);
+  border: 4px solid var(--g200);
+  box-shadow: 0 6px 20px rgba(30,80,50,.18);
   display: block;
+  margin: 0 auto 14px;
+  animation: splash-icon-pop .7s cubic-bezier(.22,.9,.36,1) .35s both,
+             splash-float 3.2s ease-in-out 1.2s infinite;
 }
 
 /* フローティングキャラクター */
@@ -1210,13 +1344,13 @@ svg { display: block; }
   pointer-events: none;
 }
 .chara-float-img {
-  width: 56px;
-  height: 56px;
+  width: 72px;
+  height: 72px;
   object-fit: cover;
   object-position: center top;
   border-radius: 50%;
-  border: 2.5px solid var(--g300);
-  box-shadow: 0 4px 16px rgba(30,80,50,.18);
+  border: 3px solid var(--g300);
+  box-shadow: 0 4px 16px rgba(30,80,50,.22);
   cursor: pointer;
   pointer-events: all;
   animation: chara-bounce 3s ease-in-out infinite;
@@ -1259,12 +1393,515 @@ svg { display: block; }
   filter: drop-shadow(0 1px 0 var(--border));
 }
 
-/* PC: 少し大きく */
+/* PC: 大きく */
 @media (min-width: 768px) {
   .chara-float {
     bottom: 24px;
     right: 24px;
   }
-  .chara-float-img { width: 64px; height: 64px; }
+  .chara-float-img {
+    width: 100px;
+    height: 100px;
+    border-width: 3.5px;
+  }
+  .splash-chara-img {
+    width: 130px;
+    height: 130px;
+  }
   .chara-bubble { font-size: 13px; max-width: 220px; }
 }
+
+/* ================================================================
+   認証モーダル
+   ================================================================ */
+
+/* モーダル本体の最大幅をやや広げる */
+.auth-modal { max-width: 420px; }
+
+/* ── ヘッダー（キャラ＋タイトル） ── */
+.auth-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 4px 0 20px;
+  position: relative;
+}
+.auth-chara-img {
+  width: 64px;
+  height: 64px;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 50%;
+  border: 3px solid var(--g200);
+  box-shadow: 0 4px 14px rgba(30,80,50,.15);
+  flex-shrink: 0;
+}
+.auth-header-text {
+  flex: 1;
+  min-width: 0;
+}
+.auth-header-title {
+  font-size: 20px;
+  font-weight: 900;
+  color: var(--g800);
+  letter-spacing: -.3px;
+  line-height: 1.2;
+}
+.auth-header-sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+}
+.auth-close-btn {
+  position: absolute;
+  top: 0;
+  right: 0;
+  flex-shrink: 0;
+}
+
+/* タブバー */
+.auth-tabs {
+  display: flex;
+  gap: 0;
+  margin: 0 0 18px;
+  background: var(--g100);
+  border-radius: 12px;
+  padding: 3px;
+}
+.auth-tab {
+  flex: 1;
+  padding: 8px 4px;
+  font-size: 12px;
+  font-weight: 700;
+  background: transparent;
+  color: var(--muted);
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background .18s, color .18s, box-shadow .18s;
+}
+.auth-tab.active {
+  background: var(--white);
+  color: var(--g700);
+  box-shadow: 0 2px 8px rgba(30,80,50,.10);
+}
+
+/* Google ログインボタン */
+.btn-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  padding: 13px;
+  background: var(--white);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--r-sm);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  cursor: pointer;
+  margin: 0 0 16px;
+  transition: background .15s, border-color .15s, box-shadow .15s;
+  box-shadow: var(--sh1);
+}
+.btn-google:hover {
+  background: var(--g50);
+  border-color: var(--g400);
+  box-shadow: 0 2px 10px rgba(76,175,125,.15);
+}
+.btn-google svg {
+  flex-shrink: 0;
+}
+
+/* 区切り線 */
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+  margin: 8px 0 16px;
+}
+.auth-divider::before,
+.auth-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* エラーテキスト */
+.auth-error {
+  font-size: 12px;
+  margin-bottom: 8px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--rose-lt);
+  color: var(--rose);
+  font-weight: 600;
+  line-height: 1.6;
+  border: 1px solid rgba(217,107,107,.2);
+}
+
+/* リンク行 */
+.auth-links {
+  text-align: center;
+  margin: 12px 0 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.auth-links a { color: var(--g600); text-decoration: none; font-weight: 600; }
+.auth-links a:hover { text-decoration: underline; }
+
+/* アカウントなしで使うボタン */
+.auth-anon-btn {
+  font-size: 13px;
+  color: var(--muted);
+}
+.auth-anon-note {
+  font-size: 11px;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 6px;
+  margin-bottom: 4px;
+  line-height: 1.6;
+}
+
+/* ================================================================
+   設定画面：アカウント状態表示
+   ================================================================ */
+.auth-status-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+  gap: 10px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.auth-status-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--g400);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.auth-status-info {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+}
+.auth-status-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--g800);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.auth-status-sub {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* ログアウトボタンを小さく・縮まないよう固定 */
+.auth-status-row .btn-secondary {
+  flex-shrink: 0;
+  width: auto;
+  padding: 7px 14px;
+  font-size: 12px;
+  margin-top: 0;
+  white-space: nowrap;
+}
+
+/* ================================================================
+   同期ステータスバー
+   ================================================================ */
+.sync-status-bar {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-b) + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--g800);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 8px 20px;
+  border-radius: 20px;
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  box-shadow: var(--sh2);
+}
+.sync-status-bar::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border: 2px solid rgba(255,255,255,.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ================================================================
+   パートナー共有モーダル
+   ================================================================ */
+
+/* 説明文 */
+.share-info-note {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.8;
+  margin-bottom: 14px;
+}
+
+/* 招待ボタン */
+.share-btn-rose {
+  background: var(--rose);
+  box-shadow: 0 4px 14px rgba(217,107,107,.32);
+}
+
+/* 招待待ちバッジ */
+.share-waiting-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  background: var(--rose-lt);
+  border: 1.5px solid rgba(217,107,107,.25);
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rose);
+}
+
+/* URLボックス */
+.share-url-box {
+  background: var(--g100);
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  padding: 9px 12px;
+  font-size: 11px;
+  color: var(--muted);
+  word-break: break-all;
+  line-height: 1.6;
+  margin: 10px 0;
+  font-family: monospace;
+  min-height: 36px;
+}
+
+/* 送信ボタン行 */
+.share-action-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+.share-btn-line {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px;
+  background: #06C755;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+}
+.share-btn-copy {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 11px;
+  background: var(--white);
+  color: var(--ink2);
+  border: 1.5px solid var(--border2);
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+}
+
+/* 接続済みバッジ */
+.share-connected-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 13px;
+  background: #e8f5ee;
+  border: 1.5px solid #b2dfc4;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--g700);
+  margin-bottom: 12px;
+}
+.share-dot-online {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--g500);
+  flex-shrink: 0;
+  animation: dot-pulse 1.6s ease-in-out infinite;
+}
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: .4; }
+}
+
+/* コメント一覧 */
+.share-comments-wrap {
+  background: var(--g100);
+  border-radius: 12px;
+  padding: 10px;
+  max-height: 240px;
+  overflow-y: auto;
+  margin-bottom: 10px;
+}
+.share-comments-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.share-comment {
+  max-width: 80%;
+  padding: 8px 11px;
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.share-comment-mine {
+  align-self: flex-end;
+  background: var(--g500);
+  color: #fff;
+  border-radius: 12px 12px 2px 12px;
+}
+.share-comment-theirs {
+  align-self: flex-start;
+  background: var(--white);
+  color: var(--ink2);
+  border: 1.5px solid var(--border);
+  border-radius: 12px 12px 12px 2px;
+}
+.share-comment-time {
+  font-size: 10px;
+  opacity: .65;
+  margin-top: 3px;
+  text-align: right;
+}
+.share-comment-mine .share-comment-time { color: rgba(255,255,255,.8); }
+
+/* コメント入力行 */
+.share-comment-input-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.share-comment-input-new {
+  flex: 1;
+  padding: 10px 13px;
+  border: 1.5px solid var(--border2);
+  border-radius: 20px;
+  font-size: 13px;
+  font-family: var(--font);
+  background: var(--white);
+  color: var(--ink);
+  outline: none;
+}
+.share-comment-input-new:focus {
+  border-color: var(--rose);
+  box-shadow: 0 0 0 3px rgba(217,107,107,.12);
+}
+.share-comment-send-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--rose);
+  color: #fff;
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: opacity .15s;
+}
+.share-comment-send-btn:active { opacity: .8; }
+
+/* 解除ボタン */
+.share-btn-leave {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: var(--r-sm);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  cursor: pointer;
+  font-family: var(--font);
+}
+.share-btn-leave:hover { color: var(--rose); border-color: var(--rose); }
+
+/* ================================================================
+   パートナービュー（生理画面 記録一覧内）
+   ================================================================ */
+.partner-period-section {
+  padding: 12px 18px;
+  background: var(--lavender-lt);
+  border-bottom: 1px solid var(--border);
+}
+.partner-period-header {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--lavender);
+  margin-bottom: 8px;
+}
+.partner-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lavender);
+  flex-shrink: 0;
+  animation: dot-pulse 1.6s ease-in-out infinite;
+}
+.partner-period-days {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.partner-period-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.partner-period-date  { font-weight: 700; width: 40px; flex-shrink: 0; }
+.partner-period-flow  { color: var(--muted); }
+.partner-period-memo  { font-size: 11px; color: var(--muted); }
+
