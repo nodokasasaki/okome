@@ -250,8 +250,8 @@ html, body {
    ================================================================ */
 .day-panel {
   background: var(--white);
-  border-top: 2px solid var(--border);
-  padding: 16px 14px;
+  border-top: 1px solid var(--border);
+  padding: 12px 14px;
 }
 .day-panel-header {
   display: flex; align-items: center; justify-content: space-between;
@@ -263,7 +263,10 @@ html, body {
   background: var(--g500); color: var(--white);
   border: none; border-radius: 20px; padding: 6px 14px;
   font-size: 12px; font-weight: 700; cursor: pointer;
+  font-family: var(--font);
   box-shadow: 0 2px 8px rgba(76,175,125,.3);
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .day-task-list { display: flex; flex-direction: column; gap: 8px; }
@@ -1911,6 +1914,30 @@ svg { display: block; }
    ================================================================ */
 .cal-search-wrap {
   padding: 8px 14px 0;
+}
+
+/* 検索バー＋記録ボタンの横並び行 */
+.cal-search-row-outer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cal-search-row-outer .cal-search-bar {
+  flex: 1;
+  min-width: 0;
+}
+/* 記録ボタン（検索バー横） */
+.cal-search-record-btn {
+  margin-top: 0 !important;
+}
+
+/* 日付ラベル */
+.cal-search-date-label {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--g800);
+  padding: 8px 2px 2px;
+  min-height: 24px;
 }
 
 /* 検索バー本体：day-task-card と同じ白カード質感 */

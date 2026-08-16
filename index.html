@@ -66,28 +66,29 @@
     </div>
   </div>
 
-  <!-- タスク検索バー -->
+  <!-- 検索バー + 記録ボタン（横並び） -->
   <div class="cal-search-wrap" id="cal-search-wrap">
-    <div class="cal-search-bar">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" class="cal-search-icon"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-      <input type="text" id="cal-search-input" class="cal-search-input" placeholder="タスクを検索…" autocomplete="off">
-      <button id="cal-search-clear" class="cal-search-clear" style="display:none;">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+    <div class="cal-search-row-outer">
+      <div class="cal-search-bar">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" class="cal-search-icon"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input type="text" id="cal-search-input" class="cal-search-input" placeholder="タスクを検索…" autocomplete="off">
+        <button id="cal-search-clear" class="cal-search-clear" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <button class="day-panel-add cal-search-record-btn" id="btn-record-done">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
+        完了を記録
       </button>
     </div>
+    <!-- 選択中の日付 -->
+    <div class="cal-search-date-label" id="day-panel-date"></div>
     <!-- 検索結果パネル -->
     <div id="cal-search-results" class="cal-search-results" style="display:none;"></div>
   </div>
 
   <!-- Day detail panel（ファーストタスク完了後に表示） -->
   <div class="day-panel">
-    <div class="day-panel-header">
-      <div class="day-panel-date" id="day-panel-date"></div>
-      <button class="day-panel-add" id="btn-record-done">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
-        完了を記録
-      </button>
-    </div>
     <div class="day-task-list" id="day-task-list"></div>
   </div>
 </div>
