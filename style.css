@@ -2120,6 +2120,43 @@ svg { display: block; }
   font-weight: 400;
 }
 
+/* タスクなし提案バナー */
+.cal-no-task-suggest {
+  text-align: center;
+  padding: 28px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.cal-no-task-suggest-text {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--g800);
+}
+.cal-no-task-suggest-sub {
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.cal-no-task-suggest-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 4px;
+  background: var(--g500);
+  color: var(--white);
+  border: none;
+  border-radius: var(--r-sm);
+  padding: 10px 22px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: var(--sh1);
+  transition: opacity .18s, transform .15s;
+}
+.cal-no-task-suggest-btn:active { opacity: .85; transform: scale(.97); }
+
 /* PC */
 @media (min-width: 768px) {
   .cal-search-wrap { padding: 10px 18px 0; }

@@ -762,34 +762,14 @@ function renderDayPanel(date) {
     return d >= 0 && d % getCycleDays(t) === 0;
   });
 
+  const noTaskBanner = document.getElementById('cal-no-task-suggest');
   const listEl = document.getElementById('day-task-list');
   if (dueTasks.length === 0) {
-    listEl.innerHTML = `
-      <div class="day-empty">
-        <svg class="day-empty-illo" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="40" r="36" fill="#eaf8f1"/>
-          <path d="M24 52 Q30 38 40 42 Q50 46 56 32" stroke="#4caf7d" stroke-width="2.5" stroke-linecap="round" fill="none"/>
-          <circle cx="40" cy="30" r="7" fill="#a8dfc0"/>
-          <path d="M37 30l2 2 4-4" stroke="#2d6a46" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-          <circle cx="28" cy="44" r="4" fill="#d4f0e2"/>
-          <circle cx="52" cy="44" r="4" fill="#d4f0e2"/>
-        </svg>
-        <div class="day-empty-msg">この日のタスクはありません</div>
-        <div class="day-empty-suggest">
-          <p class="day-empty-suggest-text">タスクを設定しませんか？</p>
-          <button class="day-empty-suggest-btn" id="btn-go-add-task">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-            タスクを追加する
-          </button>
-        </div>
-      </div>`;
-    const goBtn = listEl.querySelector('#btn-go-add-task');
-    if (goBtn) goBtn.addEventListener('click', () => {
-      document.querySelector('.nav-item[data-screen="tasks"]')?.click();
-      setTimeout(() => document.getElementById('btn-add-task')?.click(), 150);
-    });
+    if (noTaskBanner) noTaskBanner.style.display = '';
+    listEl.innerHTML = '';
     return;
   }
+  if (noTaskBanner) noTaskBanner.style.display = 'none';
 
   listEl.innerHTML = dueTasks.map(t => {
     const g    = getGenre(t.genre);
@@ -1933,6 +1913,13 @@ function bindEvents() {
     if (isDoneOn(tid, date)) { undoComplete(tid, date); showToast('取り消しました'); }
     else                     { completeTask(tid, date); showToast('完了！'); checkAndShowUnlock(); checkAndShowNewTitle(); document.dispatchEvent(new Event('taskCompleted')); }
     renderCalendar();
+  });
+
+  // タスクなし提案バナーのボタン
+  const goAddTaskBtn = document.getElementById('btn-go-add-task-banner');
+  if (goAddTaskBtn) goAddTaskBtn.addEventListener('click', () => {
+    document.querySelector('.nav-item[data-screen="tasks"]')?.click();
+    setTimeout(() => document.getElementById('btn-add-task')?.click(), 150);
   });
 
   // ウェルカムパネルのファーストタスクをクリック（トグル）

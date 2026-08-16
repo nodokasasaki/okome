@@ -82,6 +82,16 @@
     <div id="cal-search-results" class="cal-search-results" style="display:none;"></div>
   </div>
 
+  <!-- タスクなし提案バナー（検索バー直下・JS制御） -->
+  <div class="cal-no-task-suggest" id="cal-no-task-suggest" style="display:none;">
+    <p class="cal-no-task-suggest-text">この日のタスクはありません</p>
+    <p class="cal-no-task-suggest-sub">タスクを設定しませんか？</p>
+    <button class="cal-no-task-suggest-btn" id="btn-go-add-task-banner">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+      タスクを追加する
+    </button>
+  </div>
+
   <!-- Day detail panel（ファーストタスク完了後に表示） -->
   <div class="day-panel">
     <div class="day-task-list" id="day-task-list"></div>
