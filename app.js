@@ -731,6 +731,8 @@ function renderDayPanel(date) {
   if (welcomeEl) welcomeEl.style.display = 'none';
 
   document.getElementById('day-panel-date').textContent = D.jpFull(date);
+  const dayPanelDateTop = document.getElementById('day-panel-date-top');
+  if (dayPanelDateTop) dayPanelDateTop.textContent = D.jpFull(date);
   // バナー内の日付も同期
   const setupDateEl = document.getElementById('setup-banner-date');
   if (setupDateEl) setupDateEl.textContent = D.jpFull(date);
