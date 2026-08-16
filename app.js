@@ -586,6 +586,97 @@ function renderCalendar() {
 }
 
 // --- Day panel ---
+// ----------------------------------------------------------------
+// 5c. カレンダー検索
+// ----------------------------------------------------------------
+function renderCalSearchResults(q) {
+  const el = document.getElementById('cal-search-results');
+  if (!el) return;
+
+  const query   = q.toLowerCase();
+  const tasks   = DB.get(DB.K.tasks);
+  const logs    = DB.get(DB.K.logs);
+  const today   = D.today();
+
+  // ① タスク名・ジャンルラベルでマッチするタスクを探す
+  const matchedTasks = tasks.filter(t => {
+    const g = getGenre(t.genre);
+    return t.name.toLowerCase().includes(query) ||
+           g.label.toLowerCase().includes(query);
+  });
+
+  if (!matchedTasks.length) {
+    el.innerHTML = `<div class="cal-search-empty">「${_escapeHtml(q)}」に一致するタスクはありません</div>`;
+    return;
+  }
+
+  // ② マッチしたタスクごとに「直近の完了ログ」と「次回予定日」を列挙（最大5件ずつ）
+  const rows = [];
+
+  matchedTasks.forEach(t => {
+    const g = getGenre(t.genre);
+
+    // 過去ログ（新しい順・最大3件）
+    const taskLogs = logs
+      .filter(l => l.taskId === t.id)
+      .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
+      .slice(0, 3);
+
+    taskLogs.forEach(l => {
+      rows.push({
+        date:     l.completedAt,
+        taskName: t.name,
+        genre:    g,
+        type:     'done',
+        isPast:   l.completedAt < today,
+      });
+    });
+
+    // 直近の予定日（未来・最大2件）
+    let cur = nextDue(t);
+    const cycleD = getCycleDays(t);
+    // 今日以前ならまず今日以降に進める
+    while (cur < today) cur = D.addDays(cur, cycleD);
+    for (let i = 0; i < 2; i++) {
+      rows.push({
+        date:     cur,
+        taskName: t.name,
+        genre:    g,
+        type:     'upcoming',
+        isPast:   false,
+      });
+      cur = D.addDays(cur, cycleD);
+    }
+  });
+
+  // 日付で降順ソート（過去ログ）→ 昇順（予定）に分けて表示
+  const pastRows     = rows.filter(r => r.type === 'done').sort((a,b) => b.date.localeCompare(a.date));
+  const upcomingRows = rows.filter(r => r.type === 'upcoming').sort((a,b) => a.date.localeCompare(b.date));
+  const allRows      = [...upcomingRows, ...pastRows].slice(0, 20);
+
+  if (!allRows.length) {
+    el.innerHTML = `<div class="cal-search-empty">「${_escapeHtml(q)}」の記録はまだありません</div>`;
+    return;
+  }
+
+  el.innerHTML = allRows.map(r => {
+    const badgeClass = r.type === 'done' ? 'cal-search-badge-done' : 'cal-search-badge-upcoming';
+    const badgeText  = r.type === 'done' ? '完了' : '予定';
+    const isToday    = r.date === today;
+    return `
+    <div class="cal-search-row" data-search-date="${r.date}">
+      <div class="cal-search-row-icon" style="background:${r.genre.bg};">
+        <svg viewBox="0 0 24 24" fill="none" stroke="${r.genre.color}" stroke-width="1.8" width="16" height="16">${r.genre.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
+      </div>
+      <div class="cal-search-row-body">
+        <div class="cal-search-row-name">${_escapeHtml(r.taskName)}</div>
+        <div class="cal-search-row-date">${isToday ? '今日' : D.jpFull(r.date)}</div>
+      </div>
+      <span class="cal-search-badge ${badgeClass}">${badgeText}</span>
+    </div>`;
+  }).join('');
+}
+
 function renderDayPanel(date) {
   const cleared = isFirstTaskCleared();
   const dayPanel = document.querySelector('.day-panel');
@@ -2078,6 +2169,46 @@ function bindEvents() {
   // バナー内の「完了を記録」ボタン → 記録モーダルを開く
   document.getElementById('btn-setup-record-done')?.addEventListener('click', () => {
     openRecordModal(calSelectedDate);
+  });
+
+  // カレンダー検索
+  const searchInput = document.getElementById('cal-search-input');
+  const searchClear = document.getElementById('cal-search-clear');
+  const searchResults = document.getElementById('cal-search-results');
+
+  searchInput.addEventListener('input', () => {
+    const q = searchInput.value.trim();
+    searchClear.style.display = q ? '' : 'none';
+    if (!q) {
+      searchResults.style.display = 'none';
+      return;
+    }
+    renderCalSearchResults(q);
+    searchResults.style.display = '';
+  });
+
+  searchClear.addEventListener('click', () => {
+    searchInput.value = '';
+    searchClear.style.display = 'none';
+    searchResults.style.display = 'none';
+    searchInput.focus();
+  });
+
+  // 検索結果の行タップ → その日に移動してパネルを開く
+  searchResults.addEventListener('click', e => {
+    const row = e.target.closest('[data-search-date]');
+    if (!row) return;
+    const date = row.dataset.searchDate;
+    searchInput.value = '';
+    searchClear.style.display = 'none';
+    searchResults.style.display = 'none';
+    // 対象月に移動
+    const d = new Date(date + 'T00:00:00');
+    calYear  = d.getFullYear();
+    calMonth = d.getMonth();
+    calSelectedDate = date;
+    renderCalendar();
+    renderDayPanel(date);
   });
 
   // settings

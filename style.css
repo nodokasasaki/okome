@@ -1905,3 +1905,126 @@ svg { display: block; }
 .partner-period-flow  { color: var(--muted); }
 .partner-period-memo  { font-size: 11px; color: var(--muted); }
 
+
+/* ================================================================
+   カレンダー検索バー
+   ================================================================ */
+.cal-search-wrap {
+  padding: 8px 10px 0;
+}
+.cal-search-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1.5px solid var(--border2);
+  border-radius: 20px;
+  padding: 8px 12px;
+  transition: border-color .15s, box-shadow .15s;
+}
+.cal-search-bar:focus-within {
+  border-color: var(--g500);
+  box-shadow: 0 0 0 3px rgba(76,175,125,.12);
+}
+.cal-search-icon {
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.cal-search-input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  font-family: var(--font);
+  color: var(--ink);
+  outline: none;
+  min-width: 0;
+}
+.cal-search-input::placeholder { color: var(--muted); }
+.cal-search-clear {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 2px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.cal-search-clear:hover { color: var(--ink2); }
+
+/* 検索結果パネル */
+.cal-search-results {
+  margin-top: 6px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  box-shadow: var(--sh2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.cal-search-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border);
+  transition: background .12s;
+}
+.cal-search-row:last-child { border-bottom: none; }
+.cal-search-row:active { background: var(--g100); }
+.cal-search-row-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.cal-search-row-body {
+  flex: 1;
+  min-width: 0;
+}
+.cal-search-row-name {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cal-search-row-date {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 2px;
+}
+.cal-search-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+.cal-search-badge-done {
+  background: var(--g200);
+  color: var(--g700);
+}
+.cal-search-badge-upcoming {
+  background: var(--amber-lt);
+  color: var(--amber);
+}
+.cal-search-empty {
+  padding: 16px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+/* PC */
+@media (min-width: 768px) {
+  .cal-search-wrap { padding: 10px 18px 0; }
+}
+
