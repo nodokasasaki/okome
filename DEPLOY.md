@@ -247,8 +247,26 @@ git checkout main && git merge dev && git push origin main && git checkout dev
 **初回設定（一度だけ）:**
 1. https://dash.cloudflare.com → Workers & Pages → Create application → Pages
 2. 「Connect to Git」→ GitHub の `nodokasasaki/okome` を選択
-3. Branch: `main`、Build command: なし（空欄）、Build output: `/`（ルート）
-4. 「Save and Deploy」
+3. 以下を設定：
+   - Branch: `main`
+   - **Build command: `sh build.sh`**
+   - Build output directory: `/`（ルート）
+4. 「Environment variables」セクションで以下を追加（本番・プレビュー両方に設定）：
+
+| 変数名 | 値 |
+|--------|-----|
+| `FIREBASE_API_KEY` | Firebase の apiKey |
+| `FIREBASE_AUTH_DOMAIN` | Firebase の authDomain |
+| `FIREBASE_PROJECT_ID` | Firebase の projectId |
+| `FIREBASE_STORAGE_BUCKET` | Firebase の storageBucket |
+| `FIREBASE_MESSAGING_SENDER_ID` | Firebase の messagingSenderId |
+| `FIREBASE_APP_ID` | Firebase の appId |
+
+5. 「Save and Deploy」
+
+> 設定後は `git push origin main` するだけで、ビルド時に `build.sh` が自動実行され
+> `firebase-config.js` が生成されます。APIキーはCloudflareのサーバー内にのみ存在し、
+> GitHubには一切記録されません。
 
 ---
 

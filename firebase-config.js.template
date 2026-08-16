@@ -1,0 +1,44 @@
+/* ================================================================
+   おうちリズム — Firebase 設定テンプレート
+   ================================================================
+   このファイルは参照用テンプレートです。
+   実際の firebase-config.js は以下のいずれかの方法で用意してください：
+
+   【ローカル開発】
+     このファイルをコピーして firebase-config.js にリネームし、
+     実際の値を入力してください。
+     firebase-config.js は .gitignore に含まれており、
+     誤ってコミットされません。
+
+   【Cloudflare Pages（本番・プレビュー）】
+     ダッシュボードで以下の環境変数を設定すると、
+     build.sh が自動的に firebase-config.js を生成します。
+
+     FIREBASE_API_KEY
+     FIREBASE_AUTH_DOMAIN
+     FIREBASE_PROJECT_ID
+     FIREBASE_STORAGE_BUCKET
+     FIREBASE_MESSAGING_SENDER_ID
+     FIREBASE_APP_ID
+   ================================================================ */
+
+const FIREBASE_CONFIG = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.firebasestorage.app",
+  messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
+  appId:             "YOUR_APP_ID",
+};
+
+const FIREBASE_CONFIGURED =
+  FIREBASE_CONFIG.apiKey !== "YOUR_API_KEY" &&
+  FIREBASE_CONFIG.projectId !== "YOUR_PROJECT_ID";
+
+if (!FIREBASE_CONFIGURED) {
+  console.warn(
+    '[おうちリズム] firebase-config.js が未設定です。' +
+    'ローカル（localStorage）モードで動作します。' +
+    'Firebase を使うには firebase-config.js の値を書き換えてください。'
+  );
+}
