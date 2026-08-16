@@ -1916,30 +1916,6 @@ svg { display: block; }
   padding: 8px 14px 0;
 }
 
-/* 検索バー＋記録ボタンの横並び行 */
-.cal-search-row-outer {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.cal-search-row-outer .cal-search-bar {
-  flex: 1;
-  min-width: 0;
-}
-/* 記録ボタン（検索バー横） */
-.cal-search-record-btn {
-  margin-top: 0 !important;
-}
-
-/* 日付ラベル */
-.cal-search-date-label {
-  font-size: 13px;
-  font-weight: 800;
-  color: var(--g800);
-  padding: 8px 2px 2px;
-  min-height: 24px;
-}
-
 /* 検索バー本体：day-task-card と同じ白カード質感 */
 .cal-search-bar {
   display: flex;
