@@ -217,6 +217,17 @@
 
   <!-- アカウント -->
   <div class="setting-section-header">アカウント・同期</div>
+  <!-- 匿名ユーザー向け登録促進バナー（JS制御） -->
+  <div id="anon-user-warning" class="anon-warning-banner" style="display:none;">
+    <div class="anon-warning-icon">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    </div>
+    <div class="anon-warning-body">
+      <div class="anon-warning-title">データが消える可能性があります</div>
+      <div class="anon-warning-desc">現在はゲストモードです。ブラウザのデータが消えるとタスク・生理記録がすべて失われます。アカウント登録するとクラウドに安全に保存されます。</div>
+      <button class="anon-warning-btn" id="btn-anon-upgrade">アカウントを登録する</button>
+    </div>
+  </div>
   <div id="auth-account-area" style="padding:12px 18px 14px;"></div>
 
   <div class="divider-bar"></div>
@@ -604,6 +615,21 @@
 </button>
 
 </div><!-- #app -->
+
+<!-- ================================================================
+     プライバシーポリシー同意バナー（初回起動時のみ表示）
+     ================================================================ -->
+<div id="privacy-banner" class="privacy-banner" style="display:none;">
+  <div class="privacy-banner-inner">
+    <div class="privacy-banner-text">
+      本サービスは生理周期などの健康情報を含む個人データを扱います。
+      ご利用には<a href="/privacy.html" target="_blank" rel="noopener" class="privacy-banner-link">プライバシーポリシー</a>への同意が必要です。
+    </div>
+    <div class="privacy-banner-actions">
+      <button id="btn-privacy-agree" class="privacy-banner-btn-agree">同意して使う</button>
+    </div>
+  </div>
+</div>
 
 <!-- ================================================================
      同期ステータスバー

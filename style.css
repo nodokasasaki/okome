@@ -2219,3 +2219,107 @@ svg { display: block; }
 #day-panel-header-row {
   margin-bottom: 10px;
 }
+
+/* ================================================================
+   プライバシーポリシー同意バナー（初回起動時・画面下部固定）
+   ================================================================ */
+.privacy-banner {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-b));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: var(--g900);
+  color: #fff;
+  z-index: 9000;
+  padding: 0;
+}
+.privacy-banner-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+}
+.privacy-banner-text {
+  font-size: 12px;
+  line-height: 1.7;
+  color: rgba(255,255,255,.85);
+}
+.privacy-banner-link {
+  color: var(--g400);
+  text-underline-offset: 2px;
+}
+.privacy-banner-actions {
+  display: flex;
+  gap: 8px;
+}
+.privacy-banner-btn-agree {
+  flex: 1;
+  padding: 10px;
+  background: var(--g500);
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity .15s;
+}
+.privacy-banner-btn-agree:active { opacity: .85; }
+@media (min-width: 768px) {
+  .privacy-banner {
+    max-width: 100%;
+    left: 220px;
+    transform: none;
+    bottom: 0;
+  }
+}
+
+/* ================================================================
+   匿名ユーザー向け登録促進バナー（設定画面）
+   ================================================================ */
+.anon-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: #fff8c5;
+  border: 1.5px solid #f0c000;
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  margin: 8px 18px 0;
+}
+.anon-warning-icon {
+  flex-shrink: 0;
+  color: #9a6700;
+  margin-top: 2px;
+}
+.anon-warning-body { flex: 1; min-width: 0; }
+.anon-warning-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: #6b4c00;
+  margin-bottom: 4px;
+}
+.anon-warning-desc {
+  font-size: 12px;
+  color: #7a5c00;
+  line-height: 1.7;
+  margin-bottom: 10px;
+}
+.anon-warning-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 7px 16px;
+  background: var(--amber);
+  color: #fff;
+  border: none;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity .15s;
+}
+.anon-warning-btn:active { opacity: .85; }

@@ -368,17 +368,25 @@ function _commentsRef(roomId) {
 // ----------------------------------------------------------------
 // ルーム作成（招待する側）
 // ----------------------------------------------------------------
+// 招待URLの有効期限（ミリ秒）: 72時間
+const INVITE_EXPIRE_MS = 72 * 60 * 60 * 1000;
+
 async function createShareRoom() {
   if (!_db) return { error: 'Firebase未設定' };
   const uid = getUserId?.();
   if (!uid) return { error: 'ログインが必要です' };
+  // 匿名ユーザーは招待を作成できない
+  if (isAnonymous?.()) return { error: 'パートナー共有にはアカウント登録が必要です' };
 
   try {
     const roomRef = _db.collection('share_rooms').doc(); // 自動ID
+    // expiresAt: 72時間後のタイムスタンプ（Firestore ルール側でも検証可能）
+    const expiresAt = new Date(Date.now() + INVITE_EXPIRE_MS);
     await roomRef.set({
       ownerUid:   uid,
       partnerUid: null,
       createdAt:  firebase.firestore.FieldValue.serverTimestamp(),
+      expiresAt:  firebase.firestore.Timestamp.fromDate(expiresAt),
     });
     return { ok: true, roomId: roomRef.id };
   } catch (e) {
@@ -394,6 +402,8 @@ async function joinShareRoom(roomId) {
   if (!_db) return { error: 'Firebase未設定' };
   const uid = getUserId?.();
   if (!uid) return { error: 'ログインが必要です' };
+  // 匿名ユーザーはパートナー接続不可（生理情報という要配慮個人情報のため実名認証必須）
+  if (isAnonymous?.()) return { error: 'パートナー共有にはアカウント登録が必要です' };
 
   try {
     const snap = await _roomRef(roomId).get();
@@ -402,6 +412,14 @@ async function joinShareRoom(roomId) {
     const room = snap.data();
     if (room.ownerUid === uid) return { error: '自分自身とは共有できません' };
     if (room.partnerUid && room.partnerUid !== uid) return { error: 'このルームは既に使用されています' };
+
+    // 有効期限チェック（expiresAt が存在する場合のみ）
+    if (room.expiresAt) {
+      const expiry = room.expiresAt.toDate ? room.expiresAt.toDate() : new Date(room.expiresAt);
+      if (Date.now() > expiry.getTime()) {
+        return { error: '招待リンクの有効期限が切れています（72時間以内に参加が必要です）' };
+      }
+    }
 
     if (!room.partnerUid) {
       await _roomRef(roomId).update({ partnerUid: uid });

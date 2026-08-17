@@ -131,16 +131,23 @@ service cloud.firestore {
 
     // パートナー共有ルーム
     match /share_rooms/{roomId} {
-      allow create: if request.auth != null;
+      // 作成：ログイン済み（匿名除く）かつ匿名ユーザー不可
+      allow create: if request.auth != null && !request.auth.token.firebase.sign_in_provider.matches('anonymous');
+
+      // 読み取り・更新：自分がオーナーまたはパートナーのみ
+      // ※ partnerUid == null 条件を削除（他ユーザーが未接続ルームを読める脆弱性を修正）
       allow read, update: if request.auth != null && (
         resource.data.ownerUid == request.auth.uid ||
-        resource.data.partnerUid == request.auth.uid ||
-        resource.data.partnerUid == null
+        resource.data.partnerUid == request.auth.uid
       );
+
+      // 削除：オーナーまたはパートナーのみ
       allow delete: if request.auth != null && (
         resource.data.ownerUid == request.auth.uid ||
         resource.data.partnerUid == request.auth.uid
       );
+
+      // サブコレクション（comments / notifications）：ルームメンバーのみ
       match /{sub}/{docId} {
         allow read, write: if request.auth != null && (
           get(/databases/$(database)/documents/share_rooms/$(roomId)).data.ownerUid == request.auth.uid ||
@@ -152,6 +159,10 @@ service cloud.firestore {
   }
 }
 ```
+
+> **変更点（2025年）**
+> - `share_rooms` の `read` 条件から `partnerUid == null` を削除（未接続ルームの不正読み取り脆弱性を修正）
+> - ルーム `create` 条件に匿名ユーザー不可を追加
 
 ### Step 6 — Authorized Domains を追加（Googleログイン用）
 

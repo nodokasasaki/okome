@@ -412,12 +412,27 @@ function checkShareURLOnLoad() {
   if (roomId) {
     history.replaceState(null, '', location.pathname);
     onAuthReady(async user => {
-      if (!user) {
-        // ログインが必要 → 認証モーダルを出してからもう一度実行
-        openAuthModal('login');
+      // 未ログイン または 匿名ユーザーの場合はアカウント登録を必須にする
+      // （生理記録という要配慮個人情報を共有するため匿名不可）
+      if (!user || isAnonymous()) {
+        // 招待からの遷移であることをモーダルのサブテキストで伝える
+        showToast('パートナー共有にはアカウント登録が必要です');
+        openAuthModal('register');
+        // 匿名ボタンを一時的に非表示にする
+        const anonBtn = document.getElementById('btn-anon-login');
+        if (anonBtn) anonBtn.style.display = 'none';
+        const anonNote = document.querySelector('.auth-anon-note');
+        if (anonNote) anonNote.style.display = 'none';
+
         const _retry = setInterval(async () => {
-          if (!getUserId()) return;
+          // 実アカウントでログインするまで待つ（匿名は除外）
+          if (!getUserId() || isAnonymous()) return;
           clearInterval(_retry);
+          // ボタンを元に戻す
+          const anonBtnR = document.getElementById('btn-anon-login');
+          if (anonBtnR) anonBtnR.style.display = '';
+          const anonNoteR = document.querySelector('.auth-anon-note');
+          if (anonNoteR) anonNoteR.style.display = '';
           const result = await acceptInvite(roomId);
           if (result.ok) {
             showToast('パートナーと接続しました！');
@@ -1565,6 +1580,12 @@ function renderSettings() {
   document.getElementById('setting-clean-level').value = s.cleanLevel  || 'normal';
   document.getElementById('setting-cycle').value        = s.cycleLength || 28;
   document.getElementById('setting-period-len').value   = s.periodLen   || 5;
+
+  // 匿名ユーザー向け：データ消失リスクを警告してアカウント登録を促す
+  const anonWarning = document.getElementById('anon-user-warning');
+  if (anonWarning) {
+    anonWarning.style.display = (FIREBASE_CONFIGURED && isAnonymous?.()) ? '' : 'none';
+  }
 }
 
 function saveSettings() {
@@ -1575,6 +1596,23 @@ function saveSettings() {
     periodLen:   Number(document.getElementById('setting-period-len').value),
   });
   showToast('設定を保存しました');
+}
+
+// ----------------------------------------------------------------
+// 9b. プライバシーポリシー同意
+// ----------------------------------------------------------------
+const PRIVACY_AGREED_KEY = 'or2_privacy_agreed';
+
+function initPrivacyBanner() {
+  // 同意済みなら表示しない
+  if (localStorage.getItem(PRIVACY_AGREED_KEY) === '1') return;
+  const banner = document.getElementById('privacy-banner');
+  if (!banner) return;
+  banner.style.display = '';
+  document.getElementById('btn-privacy-agree').addEventListener('click', () => {
+    localStorage.setItem(PRIVACY_AGREED_KEY, '1');
+    banner.style.display = 'none';
+  });
 }
 
 // ----------------------------------------------------------------
@@ -2609,6 +2647,14 @@ initData();
 bindEvents();
 bindUnlockEvents();
 bindAuthEvents();
+
+// 匿名ユーザー登録促進バナーのボタン
+document.getElementById('btn-anon-upgrade')?.addEventListener('click', () => {
+  openAuthModal('register');
+});
+
+// プライバシーポリシー同意バナー初期化
+initPrivacyBanner();
 
 // PC用ボタンのイベントをbindEventsの後に追加
 document.getElementById('btn-add-task-pc').addEventListener('click', () => openTaskModal());
