@@ -1928,31 +1928,22 @@ svg { display: block; }
    カレンダー検索バー
    ================================================================ */
 .cal-search-wrap {
-  padding: 8px 14px 0;
+  padding: 10px 14px 6px;
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 110;
 }
 
-/* 日付＋検索バーの横並び行：日付左・検索バー左寄せ */
+/* 検索バー行：全幅 */
 .cal-search-row-outer {
   display: flex;
   align-items: center;
-  gap: 10px;
-}
-.cal-search-row-outer .cal-search-date-label {
-  flex: 0 0 auto;
 }
 .cal-search-row-outer .cal-search-bar {
-  flex: 0 0 auto;
-  width: 200px;
-  min-width: 0;
-}
-
-/* 日付ラベル */
-.cal-search-date-label {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--g800);
-  min-height: 24px;
-  letter-spacing: -.3px;
+  flex: 1;
+  width: auto;
 }
 
 /* 検索バー本体：day-task-card と同じ白カード質感 */
@@ -2163,3 +2154,68 @@ svg { display: block; }
   .cal-search-row { padding: 11px 18px; }
 }
 
+
+/* ================================================================
+   FAB（タスク追加ボタン：タスク画面のみ表示・画面下中央）
+   ================================================================ */
+.task-fab {
+  position: fixed;
+  bottom: calc(var(--nav-h) + var(--safe-b) + 18px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 150;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: var(--g500);
+  color: var(--white);
+  border: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 18px rgba(76,175,125,.45);
+  transition: background .15s, transform .12s, box-shadow .15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.task-fab:active {
+  transform: translateX(-50%) scale(.92);
+  box-shadow: 0 2px 8px rgba(76,175,125,.3);
+}
+/* PC時は非表示（PC用topbar-btnを使用） */
+@media (min-width: 768px) {
+  .task-fab { display: none !important; }
+}
+
+/* ================================================================
+   ジャンル自動推定ヒント
+   ================================================================ */
+.genre-auto-hint {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--g600);
+  background: var(--g100);
+  padding: 2px 8px;
+  border-radius: 10px;
+  margin-left: 4px;
+}
+
+/* ================================================================
+   タスクアイテム：矢印（編集ヒント）
+   ================================================================ */
+.task-item-arrow {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--border2);
+  flex-shrink: 0;
+}
+
+/* ================================================================
+   DayPanel 日付ヘッダー行（完了ボタン付き）
+   ================================================================ */
+#day-panel-header-row {
+  margin-bottom: 10px;
+}

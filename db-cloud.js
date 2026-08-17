@@ -179,8 +179,13 @@ function startRealtimeSync(uid) {
       if (snap.metadata.hasPendingWrites) return;
       if (!snap.exists) return;
       const meta = snap.data();
-      if (meta.settings)          DB.set(DB.K.settings, meta.settings);
-      if (meta.unlocked)          DB.set(DB.K.unlocked, meta.unlocked);
+      if (meta.settings)                       DB.set(DB.K.settings, meta.settings);
+      if (meta.unlocked)                       DB.set(DB.K.unlocked, meta.unlocked);
+      if (meta.tutorial_cleared !== undefined) DB.set(DB.K.tutorial_cleared, meta.tutorial_cleared);
+      if (meta.dismissed_suggest)             DB.set(DB.K.dismissed_suggest, meta.dismissed_suggest);
+      if (meta.title_shown)                   DB.set(DB.K.title_shown, meta.title_shown);
+      // tutorial_cleared が変わると画面表示が変わるため再描画
+      renderCalendar?.();
     }, err => console.warn('[Sync] meta:', err))
   );
 
@@ -284,10 +289,11 @@ async function onUserSignedIn(user) {
   if (hasCloud) {
     // クラウドにデータあり → ダウンロードして上書き
     await downloadCloudDataToLocal(uid);
-    showToast('クラウドからデータを読み込みました');
+    showToast('同期できました！データを読み込みました');
   } else {
     // クラウドにデータなし → ローカルをアップロード
     await uploadLocalDataToCloud(uid);
+    showToast('データをクラウドに保存しました');
   }
 
   // リアルタイム同期を開始

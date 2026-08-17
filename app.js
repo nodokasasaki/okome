@@ -155,15 +155,16 @@ const D = {
 // ----------------------------------------------------------------
 // 4. タスクロジック
 // ----------------------------------------------------------------
-const CYCLE_DAYS = { daily:1, weekly:7, monthly:30, season:90, yearly:365 };
-const CYCLE_LABELS = { daily:'毎日', weekly:'週1', monthly:'月1', season:'3ヶ月', yearly:'年1', custom:'カスタム' };
-const CYCLE_PILL  = { daily:'pill-daily', weekly:'pill-weekly', monthly:'pill-monthly', season:'pill-season', yearly:'pill-yearly', custom:'pill-custom' };
+const CYCLE_DAYS = { none:0, daily:1, weekly:7, monthly:30, season:90, yearly:365 };
+const CYCLE_LABELS = { none:'なし', daily:'毎日', weekly:'週1', monthly:'月1', season:'3ヶ月', yearly:'年1', custom:'カスタム' };
+const CYCLE_PILL  = { none:'pill-custom', daily:'pill-daily', weekly:'pill-weekly', monthly:'pill-monthly', season:'pill-season', yearly:'pill-yearly', custom:'pill-custom' };
 const DIFF_LABELS = { easy:'軽め', mid:'普通', hard:'重め' };
 
-// タスクのサイクル日数を返す（custom は task.customDays を使用）
+// タスクのサイクル日数を返す（custom は task.customDays を使用、none は単発タスク）
 function getCycleDays(task) {
   if (task.cycle === 'custom') return Math.max(1, Number(task.customDays) || 1);
-  return CYCLE_DAYS[task.cycle] || 1;
+  if (task.cycle === 'none') return 99999; // 単発タスク：次回が遥か未来になるよう大きな値
+  return CYCLE_DAYS[task.cycle] || 7;
 }
 
 // タスクの周期ラベルを返す
@@ -173,6 +174,10 @@ function getCycleLabel(task) {
 }
 
 function nextDue(task) {
+  if (task.cycle === 'none') {
+    // 単発タスク：lastDoneがあれば完了済みなので遠い未来、なければ今日
+    return task.lastDone ? D.addDays(task.lastDone, 99999) : D.today();
+  }
   if (!task.lastDone) return D.today();
   return D.addDays(task.lastDone, getCycleDays(task));
 }
@@ -730,10 +735,9 @@ function renderDayPanel(date) {
   const welcomeEl = document.getElementById('cal-welcome-panel');
   if (welcomeEl) welcomeEl.style.display = 'none';
 
-  document.getElementById('day-panel-date').textContent = D.jpFull(date);
+  // 日付ラベルを同期（day-panel-date-top: DayPanel内ヘッダー、setup-banner-date: バナー内）
   const dayPanelDateTop = document.getElementById('day-panel-date-top');
   if (dayPanelDateTop) dayPanelDateTop.textContent = D.jpFull(date);
-  // バナー内の日付も同期
   const setupDateEl = document.getElementById('setup-banner-date');
   if (setupDateEl) setupDateEl.textContent = D.jpFull(date);
 
@@ -1187,8 +1191,7 @@ function renderTaskList() {
     return;
   }
 
-  // 解放後は通常表示
-  document.getElementById('btn-add-task').style.display = '';
+  // 解放後は通常表示（FABはswitchScreen/renderTaskList末尾で制御）
 
   // count + 称号バッジ
   const dueCount = tasks.filter(t => daysUntilDue(t) <= 0).length;
@@ -1267,12 +1270,13 @@ function renderTaskList() {
         ${ts.map(t => {
           const due  = daysUntilDue(t);
           let nextCls = 'ok', nextTxt = '';
-          if (due < 0)  { nextCls = 'overdue'; nextTxt = `${Math.abs(due)}日超過`; }
+          if (t.cycle === 'none') { nextCls = t.lastDone ? 'ok' : 'soon'; nextTxt = t.lastDone ? '完了済み' : '未完了'; }
+          else if (due < 0)  { nextCls = 'overdue'; nextTxt = `${Math.abs(due)}日超過`; }
           else if (due === 0) { nextCls = 'overdue'; nextTxt = `今日期限`; }
           else if (due <= 3)  { nextCls = 'soon';    nextTxt = `あと${due}日`; }
           else               { nextCls = 'ok';      nextTxt = `次回 ${D.jpShort(nextDue(t))}`; }
           return `
-          <div class="task-item" data-tid="${t.id}">
+          <div class="task-item" data-tid="${t.id}" data-edit="${t.id}" style="cursor:pointer;">
             <div class="task-item-icon" style="background:${g.bg};">
               <svg viewBox="0 0 24 24" fill="none" stroke="${g.color}" stroke-width="1.8">${g.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
             </div>
@@ -1280,16 +1284,13 @@ function renderTaskList() {
               <div class="task-item-name">${t.name}</div>
               <div class="task-item-meta">
                 <span class="pill ${CYCLE_PILL[t.cycle] || 'pill-custom'}">${getCycleLabel(t)}</span>
-                <span>${DIFF_LABELS[t.diff]}</span>
+                <span>${DIFF_LABELS[t.diff] || ''}</span>
                 <span class="task-item-next ${nextCls}">${nextTxt}</span>
               </div>
             </div>
-            <button class="task-item-edit" data-edit="${t.id}">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
-                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                <path d="M18.5 2.5a2.12 2.12 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
-              </svg>
-            </button>
+            <div class="task-item-arrow">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M9 18l6-6-6-6"/></svg>
+            </div>
           </div>`;
         }).join('')}
       </div>
@@ -1334,7 +1335,7 @@ function renderTaskList() {
     }
   }
 
-  // AI提案カードを末尾に追加（すべて表示時のみ）
+  // AI提案カードを末尾に追加（すべて表示時のみ・タスク数5件未満でも常時表示）
   let suggestHtml = '';
   if (taskGenreFilter === 'all') {
     const suggestions = generateTaskSuggestions();
@@ -1344,6 +1345,10 @@ function renderTaskList() {
   }
 
   bodyEl.innerHTML = todayDoneHtml + sections + suggestHtml;
+
+  // FABはタスク画面のときのみ表示
+  const fab = document.getElementById('btn-add-task');
+  if (fab) fab.style.display = cleared ? '' : 'none';
 }
 
 // ----------------------------------------------------------------
@@ -1577,6 +1582,26 @@ function saveSettings() {
 // ----------------------------------------------------------------
 let editingTaskId = null;
 
+// タスク名からジャンルを自動推定するキーワードマップ
+const GENRE_KEYWORDS = {
+  toilet:   ['トイレ', '便器', '便座', 'タンク', '洗浄'],
+  kitchen:  ['キッチン', 'シンク', 'コンロ', '電子レンジ', 'レンジ', '冷蔵庫', '換気扇', '調理', 'レンジフード'],
+  bath:     ['浴室', '浴槽', 'お風呂', 'バス', '風呂', '排水口', '鏡'],
+  wash:     ['洗面台', '洗面', '洗濯', '洗濯槽', '洗い'],
+  living:   ['リビング', '掃除機', '床', 'ソファ', 'テレビ', 'エアコン', '照明', 'カーペット'],
+  bedroom:  ['寝室', '枕', 'ベッド', 'クローゼット', '押し入れ', '布団'],
+  entrance: ['玄関', '靴', '下駄箱', '玄関タイル', 'ドアノブ'],
+  window:   ['窓', 'ガラス', 'ベランダ', 'カーテン', 'ブラインド'],
+};
+
+function guessGenre(name) {
+  const n = name.toLowerCase();
+  for (const [genre, keywords] of Object.entries(GENRE_KEYWORDS)) {
+    if (keywords.some(k => n.includes(k.toLowerCase()))) return genre;
+  }
+  return null;
+}
+
 function openTaskModal(taskId = null) {
   editingTaskId = taskId;
   document.getElementById('modal-task-title-text').textContent = taskId ? 'タスクを編集' : 'タスクを追加';
@@ -1587,18 +1612,20 @@ function openTaskModal(taskId = null) {
     document.getElementById('input-task-name').value  = t.name;
     document.getElementById('input-task-genre').value = t.genre;
     document.getElementById('input-task-memo').value  = t.memo || '';
-    setRadio('input-task-cycle', t.cycle);
-    setRadio('input-task-diff',  t.diff);
+    setRadio('input-task-cycle', t.cycle || 'weekly');
+    setRadio('input-task-diff',  t.diff  || 'easy');
     document.getElementById('input-custom-days').value = t.customDays || 3;
     document.getElementById('custom-days-row').style.display = t.cycle === 'custom' ? 'flex' : 'none';
   } else {
     document.getElementById('input-task-name').value  = '';
-    document.getElementById('input-task-genre').value = 'toilet';
+    document.getElementById('input-task-genre').value = 'living';
     document.getElementById('input-task-memo').value  = '';
     setRadio('input-task-cycle', 'weekly');
     setRadio('input-task-diff',  'easy');
     document.getElementById('input-custom-days').value = 3;
     document.getElementById('custom-days-row').style.display = 'none';
+    const hintEl = document.getElementById('genre-auto-hint');
+    if (hintEl) hintEl.style.display = 'none';
   }
   document.getElementById('modal-task').classList.remove('hidden');
 }
@@ -1608,7 +1635,7 @@ function closeTaskModal() { document.getElementById('modal-task').classList.add(
 function saveTask() {
   const name = document.getElementById('input-task-name').value.trim();
   if (!name) { showToast('タスク名を入力してください'); return; }
-  const cycle = getRadio('input-task-cycle');
+  const cycle = getRadio('input-task-cycle') || 'weekly';
   const customDays = cycle === 'custom'
     ? Math.max(1, Number(document.getElementById('input-custom-days').value) || 1)
     : undefined;
@@ -1620,7 +1647,7 @@ function saveTask() {
     genre: document.getElementById('input-task-genre').value,
     cycle,
     ...(cycle === 'custom' ? { customDays } : {}),
-    diff:  getRadio('input-task-diff'),
+    diff:  getRadio('input-task-diff') || 'easy',
     memo:  document.getElementById('input-task-memo').value.trim(),
   };
   const tasks = DB.get(DB.K.tasks);
@@ -1837,6 +1864,9 @@ function switchScreen(name) {
   document.getElementById(`screen-${name}`).classList.add('active');
   document.querySelector(`.nav-item[data-screen="${name}"]`).classList.add('active');
   currentScreen = name;
+  // FABはタスク画面のみ表示（renderTaskList内でも制御するが確実にするため）
+  const fab = document.getElementById('btn-add-task');
+  if (fab) fab.style.display = (name === 'tasks') ? '' : 'none';
   if (name === 'calendar') renderCalendar();
   if (name === 'tasks')    renderTaskList();
   if (name === 'period')   renderPeriod();
@@ -2002,6 +2032,11 @@ function bindEvents() {
   // add task
   document.getElementById('btn-add-task').addEventListener('click', () => openTaskModal());
 
+  // カレンダー：日パネル「完了を記録」ボタン
+  document.getElementById('btn-day-record')?.addEventListener('click', () => {
+    openRecordModal(calSelectedDate);
+  });
+
   // task modal
   document.getElementById('modal-task-close').addEventListener('click', closeTaskModal);
   document.getElementById('btn-save-task').addEventListener('click', saveTask);
@@ -2018,6 +2053,25 @@ function bindEvents() {
           b.dataset.val === 'custom' ? 'flex' : 'none';
       }
     });
+  });
+
+  // タスク名入力でジャンルを自動推定
+  document.getElementById('input-task-name').addEventListener('input', e => {
+    if (editingTaskId) return; // 編集時は変更しない
+    const name = e.target.value.trim();
+    const guessed = guessGenre(name);
+    const genreEl = document.getElementById('input-task-genre');
+    const hintEl  = document.getElementById('genre-auto-hint');
+    if (guessed && genreEl) {
+      genreEl.value = guessed;
+      if (hintEl) {
+        const g = getGenre(guessed);
+        hintEl.textContent = `→ ${g.label} に自動設定`;
+        hintEl.style.display = '';
+      }
+    } else if (hintEl) {
+      hintEl.style.display = 'none';
+    }
   });
 
   // 生理ミニカレンダー ナビゲーション
@@ -2576,6 +2630,17 @@ initAuth();
 onAuthReady(async user => {
   if (user) {
     await onUserSignedIn(user);
+  } else if (FIREBASE_CONFIGURED) {
+    // Firebase設定済みの本番環境でユーザーが未ログインの場合、
+    // 匿名ログインして自動的にクラウドへデータを保存し始める
+    try {
+      const result = await firebase.auth().signInAnonymously();
+      if (result.user) {
+        await onUserSignedIn(result.user);
+      }
+    } catch (e) {
+      console.warn('[Auth] 匿名ログイン失敗:', e);
+    }
   }
   // 今日初回起動時のスプラッシュ
   showSplash();
@@ -2735,12 +2800,66 @@ onAuthReady(async user => {
     showBubble(pickRandom(msgs), 3000);
   }, 30000);
 
-  // 初回：3秒後に挨拶
+  // 初回：3秒後に挨拶 → 5秒後に未完了タスクがあればリマインド
   setTimeout(() => {
     const h = new Date().getHours();
     const greet = h < 10 ? 'おはよう！\nよろしくね！'
                 : h < 17 ? 'こんにちは！\nよろしくね！'
                 : 'おかえり！\nよろしくね！';
-    showBubble(greet, 3500);
+    showBubble(greet, 3000);
+
+    // 5秒後：今日期限のタスクがあればリマインド
+    setTimeout(() => {
+      const today = D.today();
+      const tasks = DB.get(DB.K.tasks);
+      const logs  = DB.get(DB.K.logs);
+      const overdueTodayTasks = tasks.filter(t => {
+        const due = daysUntilDue(t);
+        return (due <= 0) && !isDoneOn(t.id, today) && t.cycle !== 'none';
+      });
+      if (overdueTodayTasks.length > 0) {
+        const names = overdueTodayTasks.slice(0, 2).map(t => t.name).join('・');
+        const msg = overdueTodayTasks.length === 1
+          ? `「${names}」\nが今日期限だよ！`
+          : `「${names}」\nなど${overdueTodayTasks.length}件が期限だよ！`;
+        showBubble(msg, 5000);
+      }
+    }, 5000);
   }, 3000);
+})();
+
+// ----------------------------------------------------------------
+// プルトゥリフレッシュ（画面下スクロールでデータ更新）
+// ----------------------------------------------------------------
+(function initPullToRefresh() {
+  let startY = 0;
+  let pulling = false;
+
+  // スマホ（max-width: 767px）のみ有効
+  const screens = document.getElementById('pc-main');
+  if (!screens) return;
+
+  screens.addEventListener('touchstart', e => {
+    startY = e.touches[0].clientY;
+    pulling = false;
+  }, { passive: true });
+
+  screens.addEventListener('touchmove', e => {
+    const deltaY = e.touches[0].clientY - startY;
+    // 下方向にスクロールし、かつページが一番下に来ているとき
+    const el = e.target.closest('.screen.active') || document.querySelector('.screen.active');
+    if (!el) return;
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
+    if (deltaY < -50 && atBottom) {
+      pulling = true;
+    }
+  }, { passive: true });
+
+  screens.addEventListener('touchend', () => {
+    if (!pulling) return;
+    pulling = false;
+    showToast('更新しました');
+    renderCalendar();
+    renderTaskList();
+  });
 })();

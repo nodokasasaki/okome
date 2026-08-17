@@ -23,6 +23,21 @@
 <div class="screen active" id="screen-calendar">
   <div class="cal-header-section">
 
+    <!-- 検索バー（最上部） -->
+    <div class="cal-search-wrap" id="cal-search-wrap">
+      <div class="cal-search-row-outer">
+        <div class="cal-search-bar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" class="cal-search-icon"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <input type="text" id="cal-search-input" class="cal-search-input" placeholder="タスクを検索…" autocomplete="off">
+          <button id="cal-search-clear" class="cal-search-clear" style="display:none;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </div>
+      <!-- 検索結果パネル -->
+      <div id="cal-search-results" class="cal-search-results" style="display:none;"></div>
+    </div>
+
     <!-- Month navigation + 称号バッジ -->
     <div class="cal-month-nav">
       <button class="cal-nav-btn" id="cal-prev">&#8249;</button>
@@ -66,23 +81,7 @@
     </div>
   </div>
 
-  <!-- 検索バー -->
-  <div class="cal-search-wrap" id="cal-search-wrap">
-    <div class="cal-search-row-outer">
-      <div class="cal-search-date-label" id="day-panel-date-top"></div>
-      <div class="cal-search-bar">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" class="cal-search-icon"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
-        <input type="text" id="cal-search-input" class="cal-search-input" placeholder="タスクを検索…" autocomplete="off">
-        <button id="cal-search-clear" class="cal-search-clear" style="display:none;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
-        </button>
-      </div>
-    </div>
-    <!-- 検索結果パネル -->
-    <div id="cal-search-results" class="cal-search-results" style="display:none;"></div>
-  </div>
-
-  <!-- タスクなし提案バナー（検索バー直下・JS制御） -->
+  <!-- タスクなし提案バナー（JS制御） -->
   <div class="cal-no-task-suggest" id="cal-no-task-suggest" style="display:none;">
     <p class="cal-no-task-suggest-text">この日のタスクはありません</p>
     <p class="cal-no-task-suggest-sub">タスクを設定しませんか？</p>
@@ -94,6 +93,14 @@
 
   <!-- Day detail panel（ファーストタスク完了後に表示） -->
   <div class="day-panel">
+    <!-- 日付 & 記録ボタン -->
+    <div class="day-panel-header" id="day-panel-header-row">
+      <div class="day-panel-date" id="day-panel-date-top"></div>
+      <button class="day-panel-add" id="btn-day-record">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
+        完了を記録
+      </button>
+    </div>
     <div class="day-task-list" id="day-task-list"></div>
   </div>
 </div>
@@ -110,9 +117,6 @@
         <div class="topbar-sub" id="tasks-sub"></div>
       </div>
     </div>
-    <button class="topbar-btn" id="btn-add-task">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
-    </button>
   </div>
   <!-- PC用ページヘッダー -->
   <div class="pc-page-header" style="display:none;" id="pc-header-tasks">
@@ -327,7 +331,7 @@
       <input type="text" class="form-input" id="input-task-name" placeholder="例：トイレ掃除">
     </div>
     <div class="form-group">
-      <label class="form-label">ジャンル</label>
+      <label class="form-label">ジャンル <span id="genre-auto-hint" class="genre-auto-hint" style="display:none;"></span></label>
       <select class="form-select" id="input-task-genre">
         <option value="toilet">トイレ</option>
         <option value="kitchen">キッチン</option>
@@ -341,8 +345,9 @@
       </select>
     </div>
     <div class="form-group">
-      <label class="form-label">周期</label>
+      <label class="form-label">周期 <span style="font-size:11px;font-weight:500;color:var(--muted);">（省略可）</span></label>
       <div class="radio-group" id="input-task-cycle">
+        <button class="radio-btn" data-val="none">なし</button>
         <button class="radio-btn" data-val="daily">毎日</button>
         <button class="radio-btn active" data-val="weekly">週1</button>
         <button class="radio-btn" data-val="monthly">月1</button>
@@ -592,6 +597,11 @@
   <div class="chara-bubble" id="chara-bubble"></div>
   <img src="kakusann.png" alt="かくさん" class="chara-float-img" id="chara-float-img">
 </div>
+
+<!-- FAB: タスク追加ボタン（タスク画面のみ表示） -->
+<button class="task-fab" id="btn-add-task" style="display:none;">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.8" width="26" height="26"><path d="M12 5v14M5 12h14"/></svg>
+</button>
 
 </div><!-- #app -->
 
