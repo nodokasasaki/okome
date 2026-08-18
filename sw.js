@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ouchi-rhythm-v15';
+const CACHE_NAME = 'ouchi-rhythm-v16';
 const ASSETS = [
   './index.html',
   './app.js',
@@ -26,8 +26,18 @@ self.addEventListener('activate', e => {
 });
 
 self.addEventListener('fetch', e => {
+  // 外部オリジン（Firebase / Google 認証など）はSWを素通りさせる
+  if (!e.request.url.startsWith(self.location.origin)) return;
+  // リダイレクトを含むレスポンスはキャッシュしない（"response has redirections" 対策）
   e.respondWith(
-    caches.match(e.request).then(cached => cached || fetch(e.request))
+    caches.match(e.request).then(cached => {
+      if (cached) return cached;
+      return fetch(e.request).then(res => {
+        // opaqueredirect や status=0 はキャッシュに入れない
+        if (!res || res.type === 'opaqueredirect' || res.redirected) return res;
+        return res;
+      });
+    })
   );
 });
 
