@@ -2527,11 +2527,6 @@ function spawnParticles() {
 }
 
 function showSplash() {
-  const key     = 'splash_last_shown';
-  const today   = D.today();
-  const last    = localStorage.getItem(key);
-  // if (last === today) return; // テスト中：毎回表示
-
   // コンテンツを組み立て
   document.getElementById('splash-greeting').textContent  = buildSplashGreeting();
   document.getElementById('splash-icon').innerHTML        = buildSplashIcon();
@@ -2547,8 +2542,6 @@ function showSplash() {
     if (e.target === document.getElementById('splash-overlay'))
       document.getElementById('splash-overlay').classList.add('hidden');
   });
-
-  localStorage.setItem(key, today);
 }
 
 // ----------------------------------------------------------------
@@ -2674,21 +2667,25 @@ initAuth();
 
 // ログイン状態が確定してからスプラッシュ表示
 onAuthReady(async user => {
-  if (user) {
-    await onUserSignedIn(user);
-  } else if (FIREBASE_CONFIGURED) {
-    // Firebase設定済みの本番環境でユーザーが未ログインの場合、
-    // 匿名ログインして自動的にクラウドへデータを保存し始める
-    try {
-      const result = await firebase.auth().signInAnonymously();
-      if (result.user) {
-        await onUserSignedIn(result.user);
+  try {
+    if (user) {
+      await onUserSignedIn(user);
+    } else if (FIREBASE_CONFIGURED) {
+      // Firebase設定済みの本番環境でユーザーが未ログインの場合、
+      // 匿名ログインして自動的にクラウドへデータを保存し始める
+      try {
+        const result = await firebase.auth().signInAnonymously();
+        if (result.user) {
+          await onUserSignedIn(result.user);
+        }
+      } catch (e) {
+        console.warn('[Auth] 匿名ログイン失敗:', e);
       }
-    } catch (e) {
-      console.warn('[Auth] 匿名ログイン失敗:', e);
     }
+  } catch (e) {
+    console.warn('[Splash] 初期化中にエラー:', e);
   }
-  // 今日初回起動時のスプラッシュ
+  // ブラウザを開くたびにスプラッシュを表示
   showSplash();
 });
 
