@@ -16,9 +16,13 @@ let _currentUser = null;  // 現在のユーザー（null = 未初期化 or 未�
 let _authReady = false;   // onAuthStateChanged の初回コールバック済みか
 let _authReadyCallbacks = [];
 
-// スマホ（タッチデバイス）では signInWithPopup がブロックされやすいため Redirect を使う
-function _isMobile() {
-  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+// スマホブラウザでは signInWithPopup がブロックされやすいため Redirect を使う。
+// ただし PWA（ホーム画面追加）のスタンドアロンモードでは Redirect が動作しないため Popup を使う。
+function _useRedirect() {
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  const isPWA    = window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true; // iOS Safari
+  return isMobile && !isPWA;
 }
 
 // ----------------------------------------------------------------
@@ -92,9 +96,8 @@ async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    if (_isMobile()) {
-      // スマホ：ポップアップがブロックされるため Redirect を使う
-      // 匿名ユーザーが居る場合は昇格（データ引き継ぎ）
+    if (_useRedirect()) {
+      // スマホブラウザ：ポップアップがブロックされるため Redirect を使う
       if (_currentUser?.isAnonymous) {
         await _currentUser.linkWithRedirect(provider);
       } else {
@@ -103,7 +106,7 @@ async function signInWithGoogle() {
       // Redirect は別ページに遷移するため、ここ以降は実行されない
       return { ok: true };
     } else {
-      // PC：ポップアップを使う
+      // PC / PWA（ホーム画面追加）：ポップアップを使う
       if (_currentUser?.isAnonymous) {
         await _currentUser.linkWithPopup(provider);
         showToast('Googleアカウントと連携しました！データを引き継ぎました');
