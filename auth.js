@@ -16,6 +16,11 @@ let _currentUser = null;  // 現在のユーザー（null = 未初期化 or 未�
 let _authReady = false;   // onAuthStateChanged の初回コールバック済みか
 let _authReadyCallbacks = [];
 
+// スマホ（タッチデバイス）では signInWithPopup がブロックされやすいため Redirect を使う
+function _isMobile() {
+  return /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+}
+
 // ----------------------------------------------------------------
 // 初期化
 // ----------------------------------------------------------------
@@ -38,6 +43,18 @@ function initAuth() {
 
     // 日本語UIを設定
     _auth.languageCode = 'ja';
+
+    // スマホ Redirect ログイン後の結果を受け取る
+    _auth.getRedirectResult().then(result => {
+      if (!result.user) return;
+      // 匿名昇格の場合はトースト表示
+      if (result.additionalUserInfo?.isNewUser === false && _currentUser?.isAnonymous) {
+        showToast('Googleアカウントと連携しました！データを引き継ぎました');
+      }
+      closeAuthModal();
+    }).catch(e => {
+      console.warn('[Auth] getRedirectResult エラー:', e);
+    });
 
     // 認証状態の変化を監視
     _auth.onAuthStateChanged(user => {
@@ -75,15 +92,27 @@ async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // 匿名ユーザーが居る場合は昇格（データ引き継ぎ）
-    if (_currentUser?.isAnonymous) {
-      await _currentUser.linkWithPopup(provider);
-      showToast('Googleアカウントと連携しました！データを引き継ぎました');
+    if (_isMobile()) {
+      // スマホ：ポップアップがブロックされるため Redirect を使う
+      // 匿名ユーザーが居る場合は昇格（データ引き継ぎ）
+      if (_currentUser?.isAnonymous) {
+        await _currentUser.linkWithRedirect(provider);
+      } else {
+        await _auth.signInWithRedirect(provider);
+      }
+      // Redirect は別ページに遷移するため、ここ以降は実行されない
+      return { ok: true };
     } else {
-      await _auth.signInWithPopup(provider);
+      // PC：ポップアップを使う
+      if (_currentUser?.isAnonymous) {
+        await _currentUser.linkWithPopup(provider);
+        showToast('Googleアカウントと連携しました！データを引き継ぎました');
+      } else {
+        await _auth.signInWithPopup(provider);
+      }
+      closeAuthModal();
+      return { ok: true };
     }
-    closeAuthModal();
-    return { ok: true };
   } catch (e) {
     // 既に別アカウントが存在する場合
     if (e.code === 'auth/credential-already-in-use' || e.code === 'auth/email-already-in-use') {
