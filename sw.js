@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ouchi-rhythm-v16';
+const CACHE_NAME = 'ouchi-rhythm-v17';
 const ASSETS = [
   './index.html',
   './app.js',
