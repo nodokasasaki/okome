@@ -294,15 +294,39 @@ html, body {
 .day-task-name.done-text { text-decoration: line-through; color: var(--muted); }
 .day-task-sub  { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .day-task-check {
-  width: 26px; height: 26px; border-radius: 50%;
+  width: 36px; height: 36px; border-radius: 50%;
   border: 2px solid var(--border2); background: var(--white);
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0; transition: all .15s;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  padding: 0;
 }
 .day-task-check.done {
   background: var(--g500); border-color: var(--g500);
 }
+.day-task-check:active { transform: scale(.9); }
 .day-task-check svg { width: 14px; height: 14px; color: var(--white); }
+
+/* 全タスク完了バナー */
+.day-all-done-banner {
+  display: flex; align-items: center; gap: 12px;
+  margin-top: 4px; padding: 14px 14px;
+  background: var(--g100); border: 1.5px solid var(--g300);
+  border-radius: var(--r-sm);
+}
+.day-all-done-icon { flex-shrink: 0; }
+.day-all-done-title { font-size: 14px; font-weight: 800; color: var(--g800); }
+.day-all-done-desc  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.day-all-done-suggest {
+  margin-top: 8px;
+  padding: 12px 14px;
+  background: var(--white); border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+}
+.day-all-done-suggest-title {
+  font-size: 12px; font-weight: 700; color: var(--muted);
+  margin-bottom: 10px;
+}
 
 .day-empty {
   text-align: center; padding: 28px 0 10px;

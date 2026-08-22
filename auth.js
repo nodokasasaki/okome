@@ -62,12 +62,22 @@ function initAuth() {
 
     // 認証状態の変化を監視
     _auth.onAuthStateChanged(user => {
+      const prevUid = _currentUser?.uid || null;
       _currentUser = user;
+
       if (!_authReady) {
+        // 初回：onAuthReady コールバックを実行
         _authReady = true;
         _authReadyCallbacks.forEach(cb => cb(user));
         _authReadyCallbacks = [];
+      } else if (user && user.uid !== prevUid) {
+        // 再ログイン（匿名→実アカウント等）：クラウド同期を再実行
+        onUserSignedIn?.(user);
+      } else if (!user && prevUid) {
+        // ログアウト：リアルタイム同期を停止
+        stopRealtimeSync?.();
       }
+
       // ヘッダーのユーザー表示を更新
       updateAuthUI(user);
     });

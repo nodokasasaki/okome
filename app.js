@@ -794,7 +794,7 @@ function renderDayPanel(date) {
     const g    = getGenre(t.genre);
     const done = isDoneOn(t.id, date);
     return `
-    <div class="day-task-card ${done ? 'done' : ''}" data-task-id="${t.id}" data-date="${date}">
+    <div class="day-task-card ${done ? 'done' : ''}" data-task-id="${t.id}" data-date="${date}" data-edit="${t.id}">
       <div class="day-task-icon" style="background:${g.bg};">
         <svg viewBox="0 0 24 24" fill="none" stroke="${g.color}" stroke-width="1.8">${g.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
       </div>
@@ -802,11 +802,55 @@ function renderDayPanel(date) {
         <div class="day-task-name ${done ? 'done-text' : ''}">${t.name}</div>
         <div class="day-task-sub">${g.label}・<span class="pill ${CYCLE_PILL[t.cycle] || 'pill-custom'}">${getCycleLabel(t)}</span>・${DIFF_LABELS[t.diff]}</div>
       </div>
-      <div class="day-task-check ${done ? 'done' : ''}">
-        ${done ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>` : ''}
-      </div>
+      <button class="day-task-check ${done ? 'done' : ''}" data-check-id="${t.id}" data-check-date="${date}" aria-label="${done ? '完了取り消し' : '完了にする'}">
+        ${done ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="opacity:.35"><circle cx="12" cy="12" r="9"/></svg>`}
+      </button>
     </div>`;
   }).join('');
+
+  // 全タスク完了済みなら提案バナーを追加表示
+  const allDone = dueTasks.length > 0 && dueTasks.every(t => isDoneOn(t.id, date));
+  if (allDone) {
+    const suggestions = generateTaskSuggestions().slice(0, 3);
+    const suggestPart = suggestions.length ? `
+      <div class="day-all-done-suggest">
+        <div class="day-all-done-suggest-title">他のタスクを追加しますか？</div>
+        ${suggestions.map(s => {
+          const sg = getGenre(s.genre);
+          return `<div class="suggest-card" data-sname="${s.name}" data-sgenre="${s.genre}" data-scycle="${s.cycle}" data-sdiff="${s.diff}" style="margin-bottom:8px;">
+            <div class="task-item-icon" style="background:${sg.bg};">
+              <svg viewBox="0 0 24 24" fill="none" stroke="${sg.color}" stroke-width="1.8">${sg.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
+            </div>
+            <div class="suggest-card-body">
+              <div class="suggest-card-name">${s.name}</div>
+              <div class="suggest-card-meta">
+                <span class="pill ${CYCLE_PILL[s.cycle] || 'pill-custom'}">${getCycleLabel(s)}</span>
+                <span style="font-size:11px;color:var(--muted);">${DIFF_LABELS[s.diff]}</span>
+              </div>
+            </div>
+            <div class="suggest-card-actions">
+              <button class="suggest-add-btn" data-sname="${s.name}" data-sgenre="${s.genre}" data-scycle="${s.cycle}" data-sdiff="${s.diff}">追加</button>
+            </div>
+          </div>`;
+        }).join('')}
+        <button class="cal-setup-banner-btn" id="btn-day-done-add-task" style="margin-top:4px;">タスクを追加する</button>
+      </div>` : '';
+    listEl.innerHTML += `
+      <div class="day-all-done-banner">
+        <div class="day-all-done-icon">
+          <svg viewBox="0 0 40 40" width="40" height="40" fill="none">
+            <rect width="40" height="40" rx="20" fill="#d4f0e2"/>
+            <path d="M11 20l7 7 11-14" stroke="#2d6a46" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="day-all-done-body">
+          <div class="day-all-done-title">この日のタスクは全て完了！</div>
+          <div class="day-all-done-desc">よくできました！新しいタスクを追加しますか？</div>
+        </div>
+      </div>
+      ${suggestPart}`;
+    document.getElementById('btn-day-done-add-task')?.addEventListener('click', () => openTaskModal());
+  }
 }
 
 // ----------------------------------------------------------------
@@ -1972,15 +2016,37 @@ function bindEvents() {
     renderCalendar();
   });
 
-  // day task card click (toggle done) — 通常のdayパネル
+  // day task list のクリックハンドラ
   document.getElementById('day-task-list').addEventListener('click', e => {
-    const card = e.target.closest('.day-task-card');
-    if (!card) return;
-    const tid  = card.dataset.taskId;
-    const date = card.dataset.date;
-    if (isDoneOn(tid, date)) { undoComplete(tid, date); showToast('取り消しました'); }
-    else                     { completeTask(tid, date); showToast('完了！'); checkAndShowUnlock(); checkAndShowNewTitle(); document.dispatchEvent(new Event('taskCompleted')); }
-    renderCalendar();
+    // ① チェックボタン → 完了/取り消しトグル
+    const checkBtn = e.target.closest('[data-check-id]');
+    if (checkBtn) {
+      e.stopPropagation();
+      const tid  = checkBtn.dataset.checkId;
+      const date = checkBtn.dataset.checkDate;
+      if (isDoneOn(tid, date)) { undoComplete(tid, date); showToast('取り消しました'); }
+      else { completeTask(tid, date); showToast('完了！'); checkAndShowUnlock(); checkAndShowNewTitle(); document.dispatchEvent(new Event('taskCompleted')); }
+      renderCalendar();
+      renderDayPanel(date);
+      return;
+    }
+    // ② AI提案「追加」ボタン（全完了後バナー内）
+    const addBtn = e.target.closest('.suggest-add-btn');
+    if (addBtn) {
+      const { sname, sgenre, scycle, sdiff } = addBtn.dataset;
+      const tasks = DB.get(DB.K.tasks);
+      if (!tasks.find(t => t.name === sname)) {
+        tasks.push({ id: uid(), name: sname, genre: sgenre, cycle: scycle, diff: sdiff,
+          memo: '', lastDone: null, createdAt: new Date().toISOString() });
+        DB.set(DB.K.tasks, tasks);
+        renderCalendar(); renderTaskList();
+        showToast(`「${sname}」を追加しました`);
+      }
+      return;
+    }
+    // ③ カード本体タップ → 編集モーダル
+    const card = e.target.closest('[data-edit]');
+    if (card) openTaskModal(card.dataset.edit);
   });
 
   // タスクなし提案バナーのボタン
