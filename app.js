@@ -773,17 +773,18 @@ function renderDayPanel(date) {
 
   const filteredTasks = calGenreFilter === 'all' ? tasks : tasks.filter(t => t.genre === calGenreFilter);
 
-  // tasks due on this date
-  const dueTasks = filteredTasks.filter(t => {
+  // tasks due on this date（完了済みは除外して表示）
+  const allDueTasks = filteredTasks.filter(t => {
     const due = nextDue(t);
     if (due > date) return false;
     const d = D.diff(date, due);
     return d >= 0 && d % getCycleDays(t) === 0;
   });
+  const dueTasks = allDueTasks.filter(t => !isDoneOn(t.id, date));
 
   const noTaskBanner = document.getElementById('cal-no-task-suggest');
   const listEl = document.getElementById('day-task-list');
-  if (dueTasks.length === 0) {
+  if (allDueTasks.length === 0) {
     if (noTaskBanner) noTaskBanner.style.display = '';
     listEl.innerHTML = '';
     return;
@@ -791,25 +792,24 @@ function renderDayPanel(date) {
   if (noTaskBanner) noTaskBanner.style.display = 'none';
 
   listEl.innerHTML = dueTasks.map(t => {
-    const g    = getGenre(t.genre);
-    const done = isDoneOn(t.id, date);
+    const g = getGenre(t.genre);
     return `
-    <div class="day-task-card ${done ? 'done' : ''}" data-task-id="${t.id}" data-date="${date}" data-edit="${t.id}">
+    <div class="day-task-card" data-task-id="${t.id}" data-date="${date}" data-edit="${t.id}">
       <div class="day-task-icon" style="background:${g.bg};">
         <svg viewBox="0 0 24 24" fill="none" stroke="${g.color}" stroke-width="1.8">${g.icon.replace(/<svg[^>]*>/,'').replace('</svg>','')}</svg>
       </div>
       <div class="day-task-body">
-        <div class="day-task-name ${done ? 'done-text' : ''}">${t.name}</div>
+        <div class="day-task-name">${t.name}</div>
         <div class="day-task-sub">${g.label}・<span class="pill ${CYCLE_PILL[t.cycle] || 'pill-custom'}">${getCycleLabel(t)}</span>・${DIFF_LABELS[t.diff]}</div>
       </div>
-      <button class="day-task-check ${done ? 'done' : ''}" data-check-id="${t.id}" data-check-date="${date}" aria-label="${done ? '完了取り消し' : '完了にする'}">
-        ${done ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5"><path d="M5 13l4 4L19 7"/></svg>` : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="opacity:.35"><circle cx="12" cy="12" r="9"/></svg>`}
+      <button class="day-task-check" data-check-id="${t.id}" data-check-date="${date}" aria-label="完了にする">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16" style="opacity:.35"><circle cx="12" cy="12" r="9"/></svg>
       </button>
     </div>`;
   }).join('');
 
-  // 全タスク完了済みなら提案バナーを追加表示
-  const allDone = dueTasks.length > 0 && dueTasks.every(t => isDoneOn(t.id, date));
+  // 全タスク完了済みなら提案バナーを追加表示（未完了タスクがゼロ＝全完了）
+  const allDone = allDueTasks.length > 0 && dueTasks.length === 0;
   if (allDone) {
     const suggestions = generateTaskSuggestions().slice(0, 3);
     const suggestPart = suggestions.length ? `
@@ -1694,20 +1694,22 @@ function openTaskModal(taskId = null) {
     document.getElementById('input-task-name').value  = t.name;
     document.getElementById('input-task-genre').value = t.genre;
     document.getElementById('input-task-memo').value  = t.memo || '';
-    setRadio('input-task-cycle', t.cycle || 'weekly');
+    setRadio('input-task-cycle', t.cycle || 'none');
     setRadio('input-task-diff',  t.diff  || 'easy');
     document.getElementById('input-custom-days').value = t.customDays || 3;
     document.getElementById('custom-days-row').style.display = t.cycle === 'custom' ? 'flex' : 'none';
   } else {
     document.getElementById('input-task-name').value  = '';
-    document.getElementById('input-task-genre').value = 'living';
     document.getElementById('input-task-memo').value  = '';
-    setRadio('input-task-cycle', 'weekly');
+    // 周期：デフォルト選択なし
+    setRadio('input-task-cycle', '');
     setRadio('input-task-diff',  'easy');
     document.getElementById('input-custom-days').value = 3;
     document.getElementById('custom-days-row').style.display = 'none';
+    // ジャンル：未選択状態（タスク名入力で自動推定）
+    document.getElementById('input-task-genre').value = '';
     const hintEl = document.getElementById('genre-auto-hint');
-    if (hintEl) hintEl.style.display = 'none';
+    if (hintEl) { hintEl.textContent = 'タスク名から自動設定'; hintEl.style.display = ''; }
   }
   document.getElementById('modal-task').classList.remove('hidden');
 }
@@ -1717,16 +1719,20 @@ function closeTaskModal() { document.getElementById('modal-task').classList.add(
 function saveTask() {
   const name = document.getElementById('input-task-name').value.trim();
   if (!name) { showToast('タスク名を入力してください'); return; }
-  const cycle = getRadio('input-task-cycle') || 'weekly';
+  // 周期：未選択の場合は 'none'（単発タスク扱い）
+  const cycle = getRadio('input-task-cycle') || 'none';
   const customDays = cycle === 'custom'
     ? Math.max(1, Number(document.getElementById('input-custom-days').value) || 1)
     : undefined;
   if (cycle === 'custom' && (!customDays || customDays < 1)) {
     showToast('日数を1以上で入力してください'); return;
   }
+  // ジャンル：未選択ならタスク名から自動推定、それでも不明なら 'other'
+  const genreEl = document.getElementById('input-task-genre');
+  const genre = genreEl.value || guessGenre(name) || 'other';
   const payload = {
     name,
-    genre: document.getElementById('input-task-genre').value,
+    genre,
     cycle,
     ...(cycle === 'custom' ? { customDays } : {}),
     diff:  getRadio('input-task-diff') || 'easy',
@@ -2159,22 +2165,27 @@ function bindEvents() {
     });
   });
 
-  // タスク名入力でジャンルを自動推定
+  // タスク名入力でジャンルを自動推定（新規追加時のみ）
   document.getElementById('input-task-name').addEventListener('input', e => {
     if (editingTaskId) return; // 編集時は変更しない
     const name = e.target.value.trim();
     const guessed = guessGenre(name);
     const genreEl = document.getElementById('input-task-genre');
     const hintEl  = document.getElementById('genre-auto-hint');
-    if (guessed && genreEl) {
+    if (guessed) {
       genreEl.value = guessed;
       if (hintEl) {
         const g = getGenre(guessed);
         hintEl.textContent = `→ ${g.label} に自動設定`;
         hintEl.style.display = '';
       }
-    } else if (hintEl) {
-      hintEl.style.display = 'none';
+    } else {
+      // 推定できない場合はジャンル未選択に戻す
+      genreEl.value = '';
+      if (hintEl) {
+        hintEl.textContent = 'タスク名から自動設定';
+        hintEl.style.display = '';
+      }
     }
   });
 

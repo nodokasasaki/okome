@@ -350,8 +350,9 @@
       <input type="text" class="form-input" id="input-task-name" placeholder="例：トイレ掃除">
     </div>
     <div class="form-group">
-      <label class="form-label">ジャンル <span id="genre-auto-hint" class="genre-auto-hint" style="display:none;"></span></label>
+      <label class="form-label">ジャンル <span id="genre-auto-hint" class="genre-auto-hint"></span></label>
       <select class="form-select" id="input-task-genre">
+        <option value="">（タスク名から自動設定）</option>
         <option value="toilet">トイレ</option>
         <option value="kitchen">キッチン</option>
         <option value="bath">浴室</option>
@@ -368,7 +369,7 @@
       <div class="radio-group" id="input-task-cycle">
         <button class="radio-btn" data-val="none">なし</button>
         <button class="radio-btn" data-val="daily">毎日</button>
-        <button class="radio-btn active" data-val="weekly">週1</button>
+        <button class="radio-btn" data-val="weekly">週1</button>
         <button class="radio-btn" data-val="monthly">月1</button>
         <button class="radio-btn" data-val="season">3ヶ月</button>
         <button class="radio-btn" data-val="yearly">年1</button>
