@@ -248,6 +248,17 @@ html, body {
 /* ================================================================
    Day Detail Panel
    ================================================================ */
+.day-panel-actions {
+  display: flex; align-items: center; gap: 6px; flex-shrink: 0;
+}
+.day-panel-add-task {
+  background: var(--white);
+  color: var(--g600);
+  border: 1.5px solid var(--border2);
+  box-shadow: none;
+}
+.day-panel-add-task:active { opacity: .8; }
+
 .day-panel {
   background: var(--white);
   border-top: 1px solid var(--border);

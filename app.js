@@ -756,6 +756,10 @@ function renderDayPanel(date) {
   const setupDateEl = document.getElementById('setup-banner-date');
   if (setupDateEl) setupDateEl.textContent = D.jpFull(date);
 
+  // 「タスクを追加」ボタン：過去日・今日どちらも常に表示
+  const addTaskBtn = document.getElementById('btn-day-add-task');
+  if (addTaskBtn) addTaskBtn.style.display = '';
+
   const tasks  = DB.get(DB.K.tasks);
 
   // タスクがファーストタスクのみ（1件以下）の場合、設定促進バナーを表示
@@ -2134,6 +2138,11 @@ function bindEvents() {
   // add task
   document.getElementById('btn-add-task').addEventListener('click', () => openTaskModal());
 
+  // カレンダー：日パネル「タスクを追加」ボタン
+  document.getElementById('btn-day-add-task')?.addEventListener('click', () => {
+    openTaskModal();
+  });
+
   // カレンダー：日パネル「完了を記録」ボタン
   document.getElementById('btn-day-record')?.addEventListener('click', () => {
     openRecordModal(calSelectedDate);
@@ -2369,6 +2378,32 @@ function bindEvents() {
     renderCalendar();
     renderDayPanel(date);
   });
+
+  // カレンダーグリッドのスワイプで月移動
+  (function bindCalSwipe() {
+    const calGrid = document.getElementById('cal-days');
+    if (!calGrid) return;
+    let swipeStartX = 0;
+    let swipeStartY = 0;
+    calGrid.addEventListener('touchstart', e => {
+      swipeStartX = e.touches[0].clientX;
+      swipeStartY = e.touches[0].clientY;
+    }, { passive: true });
+    calGrid.addEventListener('touchend', e => {
+      const dx = e.changedTouches[0].clientX - swipeStartX;
+      const dy = e.changedTouches[0].clientY - swipeStartY;
+      // 横方向の動きが縦より大きく、かつ 40px 以上で月移動
+      if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return;
+      if (dx < 0) {
+        // 左スワイプ → 次月
+        calMonth++; if (calMonth > 11) { calMonth = 0; calYear++; }
+      } else {
+        // 右スワイプ → 前月
+        calMonth--; if (calMonth < 0) { calMonth = 11; calYear--; }
+      }
+      renderCalendar();
+    }, { passive: true });
+  })();
 
   // settings
   ['setting-home-type','setting-clean-level','setting-cycle','setting-period-len'].forEach(id =>

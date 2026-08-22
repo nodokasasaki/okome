@@ -101,13 +101,19 @@
 
   <!-- Day detail panel（ファーストタスク完了後に表示） -->
   <div class="day-panel">
-    <!-- 日付 & 記録ボタン -->
+    <!-- 日付 & ボタン行 -->
     <div class="day-panel-header" id="day-panel-header-row">
       <div class="day-panel-date" id="day-panel-date-top"></div>
-      <button class="day-panel-add" id="btn-day-record">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
-        完了を記録
-      </button>
+      <div class="day-panel-actions">
+        <button class="day-panel-add day-panel-add-task" id="btn-day-add-task" style="display:none;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
+          タスクを追加
+        </button>
+        <button class="day-panel-add" id="btn-day-record">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
+          完了を記録
+        </button>
+      </div>
     </div>
     <div class="day-task-list" id="day-task-list"></div>
   </div>
