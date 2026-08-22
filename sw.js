@@ -1,17 +1,21 @@
-const CACHE_NAME = 'ouchi-rhythm-v19';
+const CACHE_NAME = 'ouchi-rhythm-v20';
+
+// SW の scope 基準の絶対 URL を生成するヘルパー
+const BASE = self.registration.scope; // 例: https://okome.pages.dev/
+
 const ASSETS = [
-  './',
-  './index.html',
-  './app.js',
-  './style.css',
-  './manifest.json',
-  './firebase-config.js',
-  './auth.js',
-  './db-cloud.js',
-  './kakusann.webp',
-  './kakusann.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
+  BASE,
+  BASE + 'index.html',
+  BASE + 'app.js',
+  BASE + 'style.css',
+  BASE + 'manifest.json',
+  BASE + 'firebase-config.js',
+  BASE + 'auth.js',
+  BASE + 'db-cloud.js',
+  BASE + 'kakusann.webp',
+  BASE + 'kakusann.png',
+  BASE + 'icons/icon-192.png',
+  BASE + 'icons/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
@@ -30,17 +34,29 @@ self.addEventListener('activate', e => {
   self.clients.claim();
 });
 
+// index.html のキャッシュエントリを取得する共通関数
+function getCachedIndex() {
+  return caches.open(CACHE_NAME).then(cache => cache.match(BASE + 'index.html'));
+}
+
 self.addEventListener('fetch', e => {
   // 外部オリジン（Firebase / Google 認証など）はSWを素通りさせる
-  if (!e.request.url.startsWith(self.location.origin)) return;
+  if (!e.request.url.startsWith(BASE)) return;
 
-  // navigate リクエスト（ページ遷移・ホーム画面起動）は常に index.html を返す
+  // navigate リクエスト（ページ遷移・ホーム画面起動・リロード）
+  // → Network First: まずネットワークを試み、失敗したらキャッシュを返す
   if (e.request.mode === 'navigate') {
     e.respondWith(
-      caches.match('./index.html').then(cached => {
-        if (cached) return cached;
-        return fetch(e.request).catch(() => caches.match('./index.html'));
-      })
+      fetch(e.request)
+        .then(res => {
+          // 正常レスポンスはキャッシュを更新してから返す
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE_NAME).then(c => c.put(BASE + 'index.html', clone));
+          }
+          return res;
+        })
+        .catch(() => getCachedIndex())
     );
     return;
   }
@@ -61,7 +77,7 @@ self.addEventListener('fetch', e => {
       }).catch(() => {
         // ネットワーク失敗時: HTML ページへのリクエストなら index.html を返す
         if (e.request.headers.get('accept')?.includes('text/html')) {
-          return caches.match('./index.html');
+          return getCachedIndex();
         }
       });
     })
