@@ -1327,13 +1327,6 @@ function renderTaskList() {
           <div class="task-genre-count">${ts.length}件</div>
         </div>
         ${ts.map(t => {
-          const due  = daysUntilDue(t);
-          let nextCls = 'ok', nextTxt = '';
-          if (t.cycle === 'none') { nextCls = t.lastDone ? 'ok' : 'soon'; nextTxt = t.lastDone ? '完了済み' : '未完了'; }
-          else if (due < 0)  { nextCls = 'overdue'; nextTxt = `${Math.abs(due)}日超過`; }
-          else if (due === 0) { nextCls = 'overdue'; nextTxt = `今日期限`; }
-          else if (due <= 3)  { nextCls = 'soon';    nextTxt = `あと${due}日`; }
-          else               { nextCls = 'ok';      nextTxt = `次回 ${D.jpShort(nextDue(t))}`; }
           return `
           <div class="task-item" data-tid="${t.id}" data-edit="${t.id}" style="cursor:pointer;">
             <div class="task-item-icon" style="background:${g.bg};">
@@ -1344,7 +1337,6 @@ function renderTaskList() {
               <div class="task-item-meta">
                 <span class="pill ${CYCLE_PILL[t.cycle] || 'pill-custom'}">${getCycleLabel(t)}</span>
                 <span>${DIFF_LABELS[t.diff] || ''}</span>
-                <span class="task-item-next ${nextCls}">${nextTxt}</span>
               </div>
             </div>
             <div class="task-item-arrow">
@@ -2920,7 +2912,7 @@ onAuthReady(async user => {
     showBubble(pickRandom(msgs), 3000);
   }, 30000);
 
-  // 初回：3秒後に挨拶 → 5秒後に未完了タスクがあればリマインド
+  // 初回：3秒後に挨拶 → 5秒後に昨日未完了タスクがあればリマインド
   setTimeout(() => {
     const h = new Date().getHours();
     const greet = h < 10 ? 'おはよう！\nよろしくね！'
@@ -2928,58 +2920,102 @@ onAuthReady(async user => {
                 : 'おかえり！\nよろしくね！';
     showBubble(greet, 3000);
 
-    // 5秒後：今日期限のタスクがあればリマインド
+    // 5秒後：昨日期限だったのに未完了のタスクをリマインド
     setTimeout(() => {
-      const today = D.today();
-      const tasks = DB.get(DB.K.tasks);
-      const logs  = DB.get(DB.K.logs);
-      const overdueTodayTasks = tasks.filter(t => {
-        const due = daysUntilDue(t);
-        return (due <= 0) && !isDoneOn(t.id, today) && t.cycle !== 'none';
+      const today     = D.today();
+      const yesterday = D.addDays(today, -1);
+      const tasks     = DB.get(DB.K.tasks);
+      // 昨日が期限（nextDue <= yesterday）で、昨日も今日も完了していないタスク
+      const missedYesterday = tasks.filter(t => {
+        if (t.cycle === 'none') return false; // 単発タスクは対象外
+        const due = nextDue(t);
+        if (due > yesterday) return false;
+        const diffDays = D.diff(yesterday, due);
+        if (diffDays < 0 || diffDays % getCycleDays(t) !== 0) return false;
+        return !isDoneOn(t.id, yesterday) && !isDoneOn(t.id, today);
       });
-      if (overdueTodayTasks.length > 0) {
-        const names = overdueTodayTasks.slice(0, 2).map(t => t.name).join('・');
-        const msg = overdueTodayTasks.length === 1
-          ? `「${names}」\nが今日期限だよ！`
-          : `「${names}」\nなど${overdueTodayTasks.length}件が期限だよ！`;
-        showBubble(msg, 5000);
+      if (missedYesterday.length > 0) {
+        const names = missedYesterday.slice(0, 2).map(t => t.name).join('・');
+        const msg = missedYesterday.length === 1
+          ? `昨日の「${names}」\nまだ残ってるよ！`
+          : `昨日の「${names}」\nなど${missedYesterday.length}件が残ってるよ！`;
+        showBubble(msg, 5500);
       }
     }, 5000);
   }, 3000);
 })();
 
 // ----------------------------------------------------------------
-// プルトゥリフレッシュ（画面下スクロールでデータ更新）
+// プルトゥリフレッシュ（画面上から下に引っ張って更新）
 // ----------------------------------------------------------------
 (function initPullToRefresh() {
+  const THRESHOLD = 64;  // 更新発動に必要な引っ張り量（px）
   let startY = 0;
   let pulling = false;
+  let pullDist = 0;
 
-  // スマホ（max-width: 767px）のみ有効
-  const screens = document.getElementById('pc-main');
-  if (!screens) return;
+  // インジケーター要素を生成
+  const indicator = document.createElement('div');
+  indicator.id = 'ptr-indicator';
+  indicator.innerHTML = `
+    <svg id="ptr-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" width="20" height="20">
+      <path d="M12 5v14M5 12l7 7 7-7"/>
+    </svg>
+    <span id="ptr-label">引っ張って更新</span>`;
+  document.body.appendChild(indicator);
 
-  screens.addEventListener('touchstart', e => {
-    startY = e.touches[0].clientY;
-    pulling = false;
+  function setIndicator(dist) {
+    const pct   = Math.min(dist / THRESHOLD, 1);
+    const ready = dist >= THRESHOLD;
+    indicator.style.transform  = `translateY(${Math.min(dist * 0.5, 36)}px)`;
+    indicator.style.opacity    = String(Math.min(pct * 1.6, 1));
+    indicator.style.display    = dist > 8 ? 'flex' : 'none';
+    document.getElementById('ptr-label').textContent = ready ? '離して更新！' : '引っ張って更新';
+    const arrow = document.getElementById('ptr-arrow');
+    if (arrow) arrow.style.transform = ready ? 'rotate(180deg)' : 'rotate(0deg)';
+  }
+
+  function hideIndicator() {
+    indicator.style.opacity   = '0';
+    indicator.style.transform = 'translateY(0)';
+    setTimeout(() => { indicator.style.display = 'none'; }, 200);
+  }
+
+  // スマホのみ有効（PC は不要）
+  if (window.matchMedia('(min-width:768px)').matches) return;
+
+  const root = document.getElementById('pc-main');
+  if (!root) return;
+
+  root.addEventListener('touchstart', e => {
+    const screen = document.querySelector('.screen.active');
+    // スクロールが一番上にいるときだけ引っ張りを受け付ける
+    if (screen && screen.scrollTop > 0) return;
+    startY   = e.touches[0].clientY;
+    pulling  = true;
+    pullDist = 0;
   }, { passive: true });
 
-  screens.addEventListener('touchmove', e => {
-    const deltaY = e.touches[0].clientY - startY;
-    // 下方向にスクロールし、かつページが一番下に来ているとき
-    const el = e.target.closest('.screen.active') || document.querySelector('.screen.active');
-    if (!el) return;
-    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 10;
-    if (deltaY < -50 && atBottom) {
-      pulling = true;
-    }
+  root.addEventListener('touchmove', e => {
+    if (!pulling) return;
+    const dy = e.touches[0].clientY - startY;
+    if (dy <= 0) { pullDist = 0; hideIndicator(); return; }
+    pullDist = dy;
+    setIndicator(dy);
   }, { passive: true });
 
-  screens.addEventListener('touchend', () => {
+  root.addEventListener('touchend', () => {
     if (!pulling) return;
     pulling = false;
-    showToast('更新しました');
-    renderCalendar();
-    renderTaskList();
+    if (pullDist >= THRESHOLD) {
+      hideIndicator();
+      showToast('更新しました');
+      renderCalendar();
+      renderTaskList();
+    } else {
+      pullDist = 0;
+      hideIndicator();
+    }
+    pullDist = 0;
   });
 })();

@@ -2347,3 +2347,29 @@ svg { display: block; }
   transition: opacity .15s;
 }
 .anon-warning-btn:active { opacity: .85; }
+
+/* ================================================================
+   プルトゥリフレッシュ インジケーター
+   ================================================================ */
+#ptr-indicator {
+  display: none;
+  position: fixed;
+  top: 0; left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  align-items: center; gap: 8px;
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 8px 18px;
+  font-size: 12px; font-weight: 700; color: var(--g700);
+  box-shadow: var(--sh2);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .15s, transform .15s;
+}
+#ptr-arrow {
+  color: var(--g600);
+  transition: transform .2s;
+  flex-shrink: 0;
+}
