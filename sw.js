@@ -1,26 +1,43 @@
-const CACHE_NAME = 'ouchi-rhythm-v20';
+const CACHE_NAME = 'ouchi-rhythm-v21';
 
 // SW の scope 基準の絶対 URL を生成するヘルパー
 const BASE = self.registration.scope; // 例: https://okome.pages.dev/
 
-const ASSETS = [
+// 必須アセット（1つでも取得失敗すると install が失敗するため、
+// デプロイに含まれないファイルは入れない）
+const ASSETS_REQUIRED = [
   BASE,
   BASE + 'index.html',
   BASE + 'app.js',
   BASE + 'style.css',
   BASE + 'manifest.json',
-  BASE + 'firebase-config.js',
   BASE + 'auth.js',
   BASE + 'db-cloud.js',
-  BASE + 'kakusann.webp',
-  BASE + 'kakusann.png',
   BASE + 'icons/icon-192.png',
   BASE + 'icons/icon-512.png',
 ];
 
+// 取得失敗してもキャッシュだけ試みる任意アセット
+const ASSETS_OPTIONAL = [
+  BASE + 'firebase-config.js',
+  BASE + 'kakusann.webp',
+  BASE + 'kakusann.png',
+];
+
 self.addEventListener('install', e => {
   e.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
+    caches.open(CACHE_NAME).then(async cache => {
+      // 必須アセットは addAll（失敗時は install ごと失敗）
+      await cache.addAll(ASSETS_REQUIRED);
+      // 任意アセットは個別に fetch し、失敗は無視
+      await Promise.allSettled(
+        ASSETS_OPTIONAL.map(url =>
+          fetch(url).then(res => {
+            if (res.ok) cache.put(url, res);
+          })
+        )
+      );
+    })
   );
   self.skipWaiting();
 });

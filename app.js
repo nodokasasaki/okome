@@ -2732,7 +2732,7 @@ if ('serviceWorker' in navigator) {
         regs.forEach(reg => reg.unregister());
       });
     } else {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   });
 }
