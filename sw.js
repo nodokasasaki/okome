@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ouchi-rhythm-v18';
+const CACHE_NAME = 'ouchi-rhythm-v19';
 const ASSETS = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const ASSETS = [
   './firebase-config.js',
   './auth.js',
   './db-cloud.js',
+  './kakusann.webp',
   './kakusann.png',
   './icons/icon-192.png',
   './icons/icon-512.png',

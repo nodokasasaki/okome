@@ -11,6 +11,11 @@
   <title>おうちリズム</title>
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <!-- preconnect: Firebase / Google -->
+  <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
+  <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
+  <!-- preload: キャラ画像（初期描画に使用） -->
+  <link rel="preload" as="image" href="kakusann.webp" type="image/webp">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -71,7 +76,10 @@
     </div>
     <div class="cal-setup-banner-inner">
       <div class="cal-setup-banner-chara">
-        <img src="kakusann.png" alt="かくさん" class="cal-setup-chara-img">
+        <picture>
+          <source srcset="kakusann.webp" type="image/webp">
+          <img src="kakusann.png" alt="かくさん" class="cal-setup-chara-img" loading="lazy">
+        </picture>
       </div>
       <div class="cal-setup-banner-body">
         <div class="cal-setup-banner-title">タスクを設定しませんか？</div>
@@ -606,7 +614,10 @@
 <!-- フローティングキャラクター -->
 <div id="chara-float" class="chara-float">
   <div class="chara-bubble" id="chara-bubble"></div>
-  <img src="kakusann.png" alt="かくさん" class="chara-float-img" id="chara-float-img">
+  <picture>
+    <source srcset="kakusann.webp" type="image/webp">
+    <img src="kakusann.png" alt="かくさん" class="chara-float-img" id="chara-float-img">
+  </picture>
 </div>
 
 <!-- FAB: タスク追加ボタン（タスク画面のみ表示） -->
@@ -645,7 +656,10 @@
 
     <!-- ヘッダー：キャラ＋タイトル -->
     <div class="auth-header">
-      <img src="kakusann.png" alt="かくさん" class="auth-chara-img">
+      <picture>
+        <source srcset="kakusann.webp" type="image/webp">
+        <img src="kakusann.png" alt="かくさん" class="auth-chara-img" loading="lazy">
+      </picture>
       <div class="auth-header-text">
         <div class="auth-header-title">おうちリズム</div>
         <div class="auth-header-sub">家事をたのしく、毎日つづける</div>
