@@ -88,43 +88,53 @@ async function uploadLocalDataToCloud(uid) {
 
 // ----------------------------------------------------------------
 // Firestore → localStorage の一括ダウンロード（ログイン時）
+//
+// 【重要】ここでは DB.set ではなく _localSet（localStorage直書き）を使う。
+//   DB.set は extendDBWithCloud() によって Firestore への再アップロードを
+//   行うよう上書きされているため、ダウンロード中に DB.set を呼ぶと
+//   ダウンロードしたばかりのデータを即座に Firestore へ書き戻してしまい
+//   競合・不整合の原因になる。
 // ----------------------------------------------------------------
 async function downloadCloudDataToLocal(uid) {
   if (!_db || !uid) return false;
+  // localStorage への直書き関数（Firestoreへの副作用なし）
+  const _localSet = (k, v) => {
+    try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+  };
   try {
+    // サーバーから強制取得（オフラインキャッシュをバイパス）
+    const opts = { source: 'server' };
+
     // meta
-    const metaSnap = await _userDoc(uid).get();
+    const metaSnap = await _userDoc(uid).get(opts);
     if (metaSnap.exists) {
       const meta = metaSnap.data();
-      if (meta.settings)          DB.set(DB.K.settings, meta.settings);
-      if (meta.tutorial_cleared !== undefined) DB.set(DB.K.tutorial_cleared, meta.tutorial_cleared);
-      if (meta.unlocked)          DB.set(DB.K.unlocked, meta.unlocked);
-      if (meta.dismissed_suggest) DB.set(DB.K.dismissed_suggest, meta.dismissed_suggest);
-      if (meta.title_shown)       DB.set(DB.K.title_shown, meta.title_shown);
+      if (meta.settings          != null) _localSet(DB.K.settings,          meta.settings);
+      if (meta.tutorial_cleared  != null) _localSet(DB.K.tutorial_cleared,  meta.tutorial_cleared);
+      if (meta.unlocked          != null) _localSet(DB.K.unlocked,          meta.unlocked);
+      if (meta.dismissed_suggest != null) _localSet(DB.K.dismissed_suggest, meta.dismissed_suggest);
+      if (meta.title_shown       != null) _localSet(DB.K.title_shown,       meta.title_shown);
     }
 
     // tasks
-    const tasksSnap = await _userCol(uid, 'tasks').get();
+    const tasksSnap = await _userCol(uid, 'tasks').get(opts);
     if (!tasksSnap.empty) {
-      const tasks = tasksSnap.docs.map(d => d.data());
-      DB.set(DB.K.tasks, tasks);
+      _localSet(DB.K.tasks, tasksSnap.docs.map(d => d.data()));
     }
 
     // logs
-    const logsSnap = await _userCol(uid, 'logs').get();
+    const logsSnap = await _userCol(uid, 'logs').get(opts);
     if (!logsSnap.empty) {
-      const logs = logsSnap.docs.map(d => d.data());
-      DB.set(DB.K.logs, logs);
+      _localSet(DB.K.logs, logsSnap.docs.map(d => d.data()));
     }
 
     // period_days
-    const periodsSnap = await _userCol(uid, 'period_days').get();
+    const periodsSnap = await _userCol(uid, 'period_days').get(opts);
     if (!periodsSnap.empty) {
-      const periods = periodsSnap.docs.map(d => d.data());
-      DB.set(DB.K.period_days, periods);
+      _localSet(DB.K.period_days, periodsSnap.docs.map(d => d.data()));
     }
 
-    console.log('[DB] クラウドデータをダウンロードしました');
+    console.log('[DB] クラウドデータをダウンロードしました（サーバー取得）');
     return true;
   } catch (e) {
     console.error('[DB] ダウンロード失敗:', e);
@@ -278,42 +288,59 @@ function _metaField(k) {
 // ----------------------------------------------------------------
 // ログイン後の初期化フロー
 // ----------------------------------------------------------------
+
+// 同一 UID で二重実行を防ぐフラグ
+let _signingInUid = null;
+
 async function onUserSignedIn(user) {
   if (!_db) return;
   const uid = user.uid;
 
+  // 同一 UID での二重実行を防ぐ（匿名→Google 昇格後の二重呼び出し対策）
+  if (_signingInUid === uid) return;
+  _signingInUid = uid;
+
   showSyncStatus('同期中…');
 
-  const hasCloud = await _checkCloudDataExists(uid);
+  try {
+    const hasCloud = await _checkCloudDataExists(uid);
 
-  if (hasCloud) {
-    // クラウドにデータあり → ダウンロードして上書き
-    await downloadCloudDataToLocal(uid);
-    showToast('同期できました！データを読み込みました');
-  } else {
-    // クラウドにデータなし → ローカルをアップロード
-    await uploadLocalDataToCloud(uid);
-    showToast('データをクラウドに保存しました');
+    if (hasCloud) {
+      // クラウドにデータあり → サーバーから強制ダウンロードして上書き
+      const ok = await downloadCloudDataToLocal(uid);
+      if (ok) showToast('同期できました！データを読み込みました');
+      else    showToast('同期に失敗しました。再度お試しください');
+    } else {
+      // クラウドにデータなし → ローカルをアップロード
+      await uploadLocalDataToCloud(uid);
+      showToast('データをクラウドに保存しました');
+    }
+  } finally {
+    _signingInUid = null;
+    // リアルタイム同期を開始
+    startRealtimeSync(uid);
+    hideSyncStatus();
+    // 画面を再描画
+    renderCalendar?.();
+    renderTaskList?.();
+    renderPeriod?.();
+    renderSettings?.();
   }
-
-  // リアルタイム同期を開始
-  startRealtimeSync(uid);
-
-  hideSyncStatus();
-
-  // 画面を再描画
-  renderCalendar?.();
-  renderTaskList?.();
-  renderPeriod?.();
-  renderSettings?.();
 }
 
 async function _checkCloudDataExists(uid) {
   try {
-    const snap = await _userCol(uid, 'tasks').limit(1).get();
+    // サーバーから強制取得してキャッシュの誤判定を防ぐ
+    const snap = await _userCol(uid, 'tasks').limit(1).get({ source: 'server' });
     return !snap.empty;
   } catch {
-    return false;
+    // サーバー取得失敗時はキャッシュで試みる
+    try {
+      const snap = await _userCol(uid, 'tasks').limit(1).get();
+      return !snap.empty;
+    } catch {
+      return false;
+    }
   }
 }
 

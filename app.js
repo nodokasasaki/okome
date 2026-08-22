@@ -2737,18 +2737,30 @@ initAuth();
 // ログイン状態が確定してからスプラッシュ表示
 onAuthReady(async user => {
   try {
-    if (user) {
+    if (user && !user.isAnonymous) {
+      // 実アカウントでログイン済み → クラウドデータを同期
       await onUserSignedIn(user);
+    } else if (user && user.isAnonymous) {
+      // 匿名ログイン済み → リアルタイム同期だけ開始（データ上書きしない）
+      startRealtimeSync?.(user.uid);
+      renderCalendar?.();
+      renderTaskList?.();
+      renderSettings?.();
     } else if (FIREBASE_CONFIGURED) {
-      // Firebase設定済みの本番環境でユーザーが未ログインの場合、
-      // 匿名ログインして自動的にクラウドへデータを保存し始める
-      try {
-        const result = await firebase.auth().signInAnonymously();
-        if (result.user) {
-          await onUserSignedIn(result.user);
+      // 未ログイン → Googleリダイレクト結果を待つため少し待機してから匿名ログイン
+      // （Redirectログイン後の復帰時は onAuthStateChanged が実アカウントで発火するため
+      //   ここでは匿名を作らず、getRedirectResult の完了を待つ）
+      await new Promise(r => setTimeout(r, 800));
+      // まだ未ログインのままなら匿名ログイン
+      if (!firebase.auth().currentUser) {
+        try {
+          const result = await firebase.auth().signInAnonymously();
+          if (result.user) {
+            startRealtimeSync?.(result.user.uid);
+          }
+        } catch (e) {
+          console.warn('[Auth] 匿名ログイン失敗:', e);
         }
-      } catch (e) {
-        console.warn('[Auth] 匿名ログイン失敗:', e);
       }
     }
   } catch (e) {
