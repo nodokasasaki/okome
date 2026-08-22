@@ -1,5 +1,6 @@
-const CACHE_NAME = 'ouchi-rhythm-v17';
+const CACHE_NAME = 'ouchi-rhythm-v18';
 const ASSETS = [
+  './',
   './index.html',
   './app.js',
   './style.css',
@@ -7,6 +8,9 @@ const ASSETS = [
   './firebase-config.js',
   './auth.js',
   './db-cloud.js',
+  './kakusann.png',
+  './icons/icon-192.png',
+  './icons/icon-512.png',
 ];
 
 self.addEventListener('install', e => {
@@ -28,14 +32,36 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   // 外部オリジン（Firebase / Google 認証など）はSWを素通りさせる
   if (!e.request.url.startsWith(self.location.origin)) return;
-  // リダイレクトを含むレスポンスはキャッシュしない（"response has redirections" 対策）
+
+  // navigate リクエスト（ページ遷移・ホーム画面起動）は常に index.html を返す
+  if (e.request.mode === 'navigate') {
+    e.respondWith(
+      caches.match('./index.html').then(cached => {
+        if (cached) return cached;
+        return fetch(e.request).catch(() => caches.match('./index.html'));
+      })
+    );
+    return;
+  }
+
+  // その他のリソース: Cache First → ネットワーク → キャッシュ保存
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;
       return fetch(e.request).then(res => {
-        // opaqueredirect や status=0 はキャッシュに入れない
-        if (!res || res.type === 'opaqueredirect' || res.redirected) return res;
+        // opaqueredirect / status=0 / リダイレクト はキャッシュに入れない
+        if (!res || res.type === 'opaqueredirect' || res.redirected || res.status === 0) {
+          return res;
+        }
+        // 同一オリジンの正常レスポンスはキャッシュに追加
+        const resClone = res.clone();
+        caches.open(CACHE_NAME).then(cache => cache.put(e.request, resClone));
         return res;
+      }).catch(() => {
+        // ネットワーク失敗時: HTML ページへのリクエストなら index.html を返す
+        if (e.request.headers.get('accept')?.includes('text/html')) {
+          return caches.match('./index.html');
+        }
       });
     })
   );
