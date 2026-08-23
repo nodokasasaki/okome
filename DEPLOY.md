@@ -4,7 +4,7 @@
 | 環境 | URL | 更新タイミング |
 |------|-----|---------------|
 | **開発環境**（Cloudflare プレビュー） | https://okomedev.pages.dev/ | `git push origin dev` のたびに自動更新 |
-| **本番環境**（Cloudflare Pages） | https://okome.pages.dev | `git push origin main` のたびに自動更新 |
+| **本番環境**（Cloudflare Pages） | https://ouchirhythm.pages.dev/ | `git push origin main` のたびに自動更新 |
 | **本番環境**（GitHub Pages） | https://nodokasasaki.github.io/okome/ | `git push origin main` のたびに自動更新 |
 | **ローカル開発** | http://localhost:8080 | `python3 -m http.server 8080` で手動起動 |
 
@@ -160,11 +160,8 @@ https://nodokasasaki.github.io/okome/
 ### 本番環境（Cloudflare Pages）
 
 ```
-https://okome.pages.dev
+https://ouchirhythm.pages.dev/
 ```
-
-> ※ Cloudflare Pages のプロジェクト作成後、ダッシュボードで確認できる実際の URL に書き換えてください。
-> カスタムドメインを設定した場合はそちらの URL を使います。
 
 ---
 
@@ -246,8 +243,8 @@ git checkout dev
 
 - `dev` を push すると Cloudflare が自動でプレビュー URL を発行します
   ```
-  https://dev.okome.pages.dev   ← dev push のたびに更新
-  https://okome.pages.dev       ← main push 時だけ更新（本番）
+  https://okomedev.pages.dev/       ← dev push のたびに更新
+  https://ouchirhythm.pages.dev/    ← main push 時だけ更新（本番）
   ```
 - **本番を変えずに動作確認したい場合は `git push origin dev` だけ使う**
 
@@ -299,10 +296,10 @@ npm install -g wrangler
 wrangler login
 
 # 3. 本番にアップロード
-wrangler pages deploy . --project-name=okome
+wrangler pages deploy . --project-name=ouchirhythm
 
 # 4. プレビュー（dev 相当）にだけ上げたい場合
-wrangler pages deploy . --project-name=okome --branch=dev
+wrangler pages deploy . --project-name=ouchirhythm --branch=dev
 
 # ※ --project-name は Cloudflare ダッシュボードのプロジェクト名に合わせる
 ```
@@ -332,8 +329,8 @@ git log --oneline -10
 | dev にプッシュ | `git push origin dev` |
 | dev を Cloudflare プレビューに反映 | `git push origin dev` |
 | main にマージして本番公開（CF & GH Pages） | `git checkout main && git merge dev && git push origin main && git checkout dev` |
-| Wrangler で本番に直接アップロード | `wrangler pages deploy . --project-name=okome` |
-| Wrangler でプレビューにだけ上げる | `wrangler pages deploy . --project-name=okome --branch=dev` |
+| Wrangler で本番に直接アップロード | `wrangler pages deploy . --project-name=ouchirhythm` |
+| Wrangler でプレビューにだけ上げる | `wrangler pages deploy . --project-name=ouchirhythm --branch=dev` |
 | ブランチ確認 | `git branch` |
 | ログ確認 | `git log --oneline -10` |
 | 変更を取り消し（未コミット） | `git restore .` |
