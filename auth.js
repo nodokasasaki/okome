@@ -48,27 +48,43 @@ function initAuth() {
     // 日本語UIを設定
     _auth.languageCode = 'ja';
 
-    // スマホ Redirect ログイン後の結果を受け取る
-    _auth.getRedirectResult().then(result => {
-      if (!result.user) return;
-      // 匿名昇格の場合はトースト表示
-      if (result.additionalUserInfo?.isNewUser === false && _currentUser?.isAnonymous) {
-        showToast('Googleアカウントと連携しました！データを引き継ぎました');
-      }
-      closeAuthModal();
-    }).catch(e => {
-      console.warn('[Auth] getRedirectResult エラー:', e);
-    });
-
     // 認証状態の変化を監視
-    _auth.onAuthStateChanged(user => {
+    // 【スマホ Redirect 対応】
+    // getRedirectResult は onAuthStateChanged より先に完了する保証がないため、
+    // onAuthStateChanged の中で getRedirectResult の完了を待ってから onAuthReady を発火する。
+    // これにより Redirect 後の復帰時に「まだ未ログイン→匿名ログイン」が先走るのを防ぐ。
+    _auth.onAuthStateChanged(async user => {
       const prevUid = _currentUser?.uid || null;
       _currentUser = user;
 
       if (!_authReady) {
-        // 初回：onAuthReady コールバックを実行
+        // 初回コールバック：Redirect 復帰の可能性があるため getRedirectResult を先に処理する
+        try {
+          const redirectResult = await _auth.getRedirectResult();
+          if (redirectResult.user) {
+            // Redirect ログイン成功
+            _currentUser = redirectResult.user;
+            if (redirectResult.additionalUserInfo?.isNewUser === false && user?.isAnonymous) {
+              showToast('Googleアカウントと連携しました！データを引き継ぎました');
+            }
+            closeAuthModal();
+          }
+        } catch (redirectErr) {
+          // Redirect ログインがエラーになった場合はモーダルにエラーを表示する
+          console.warn('[Auth] getRedirectResult エラー:', redirectErr.code, redirectErr.message);
+          if (redirectErr.code && redirectErr.code !== 'auth/no-auth-event') {
+            // モーダルがまだ表示中の場合にのみエラーを出す
+            const errEl = document.getElementById('auth-error-login');
+            if (errEl && document.getElementById('modal-auth')?.classList.contains('hidden') === false) {
+              errEl.textContent = _authErrorMsg(redirectErr);
+              errEl.style.display = 'block';
+            }
+          }
+        }
+
+        // onAuthReady コールバックを発火（getRedirectResult 完了後）
         _authReady = true;
-        _authReadyCallbacks.forEach(cb => cb(user));
+        _authReadyCallbacks.forEach(cb => cb(_currentUser));
         _authReadyCallbacks = [];
       } else if (user && user.uid !== prevUid) {
         // 再ログイン（匿名→実アカウント等）：クラウド同期を再実行
@@ -79,7 +95,7 @@ function initAuth() {
       }
 
       // ヘッダーのユーザー表示を更新
-      updateAuthUI(user);
+      updateAuthUI(_currentUser);
     });
   } catch (e) {
     console.error('[Auth] 初期化失敗:', e);
