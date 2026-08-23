@@ -333,15 +333,23 @@ async function onUserSignedIn(user) {
   showSyncStatus('同期中…');
 
   try {
+    // null = 判定不能（通信失敗・クォータ超過など）
+    // true  = Firestoreにデータあり
+    // false = Firestoreにデータなし（初回登録ユーザー）
     const hasCloud = await _checkCloudDataExists(uid);
 
-    if (hasCloud) {
+    if (hasCloud === null) {
+      // 判定不能 → データ破壊リスクを避けるためアップロードもダウンロードもしない
+      // リアルタイム同期のみ開始して、次回の再接続時に再判定する
+      console.warn('[DB] クラウドデータ存在確認に失敗。同期をスキップします。');
+      showToast('同期できませんでした。ネットワークをご確認ください');
+    } else if (hasCloud) {
       // クラウドにデータあり → サーバーから強制ダウンロードして上書き
       const ok = await downloadCloudDataToLocal(uid);
       if (ok) showToast('同期できました！データを読み込みました');
       else    showToast('同期に失敗しました。再度お試しください');
     } else {
-      // クラウドにデータなし → ローカルをアップロード
+      // クラウドにデータなし（確実に新規ユーザー）→ ローカルをアップロード
       await uploadLocalDataToCloud(uid);
       showToast('データをクラウドに保存しました');
     }
@@ -358,6 +366,11 @@ async function onUserSignedIn(user) {
   }
 }
 
+// Firestoreにそのユーザーのデータが存在するか確認する。
+// 戻り値：
+//   true  = データあり（ダウンロード優先）
+//   false = データなし（アップロードしてよい）
+//   null  = 判定不能（通信失敗・クォータ超過）→ 何もしない
 async function _checkCloudDataExists(uid) {
   try {
     // サーバーから強制取得してキャッシュの誤判定を防ぐ
@@ -369,7 +382,8 @@ async function _checkCloudDataExists(uid) {
       const snap = await _userCol(uid, 'tasks').limit(1).get();
       return !snap.empty;
     } catch {
-      return false;
+      // 両方失敗 → 判定不能。false を返すとローカルデータでクラウドを上書きしてしまうため null を返す
+      return null;
     }
   }
 }
