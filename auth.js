@@ -16,13 +16,10 @@ let _currentUser = null;  // 現在のユーザー（null = 未初期化 or 未�
 let _authReady = false;   // onAuthStateChanged の初回コールバック済みか
 let _authReadyCallbacks = [];
 
-// スマホブラウザでは signInWithPopup がブロックされやすいため Redirect を使う。
-// ただし PWA（ホーム画面追加）のスタンドアロンモードでは Redirect が動作しないため Popup を使う。
-function _useRedirect() {
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  const isPWA    = window.matchMedia('(display-mode: standalone)').matches
-                || window.navigator.standalone === true; // iOS Safari
-  return isMobile && !isPWA;
+// Redirect は browser sessionStorage に依存し、近年のブラウザ環境では失敗しやすいため
+// Googleログインは Popup を優先し、明示的にブロックされた場合のみ Redirect にフォールバックする。
+function _shouldFallbackToRedirect(err) {
+  return err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request';
 }
 
 // ----------------------------------------------------------------
@@ -125,42 +122,41 @@ async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    if (_useRedirect()) {
-      // スマホブラウザ：ポップアップがブロックされるため Redirect を使う
-      if (_currentUser?.isAnonymous) {
-        await _currentUser.linkWithRedirect(provider);
-      } else {
-        await _auth.signInWithRedirect(provider);
-      }
-      // Redirect は別ページに遷移するため、ここ以降は実行されない
-      return { ok: true };
-    } else {
-      // PC / PWA（ホーム画面追加）：ポップアップを使う
-      if (_currentUser?.isAnonymous) {
-        try {
-          await _currentUser.linkWithPopup(provider);
-          showToast('Googleアカウントと連携しました！データを引き継ぎました');
-        } catch (linkErr) {
-          // 既存の実アカウントと同じGoogleアカウントを選択した場合は
-          // linkWithPopup が失敗するので、通常のサインインにフォールバック。
-          // credential-already-in-use: e.credential が取れる場合はそれを使う
-          // account-exists-with-different-credential: e.credential がない場合も想定
-          if (linkErr.code === 'auth/credential-already-in-use' ||
-              linkErr.code === 'auth/account-exists-with-different-credential') {
-            const cred = linkErr.credential
-              ? _auth.signInWithCredential(linkErr.credential)
-              : _auth.signInWithPopup(provider);
-            await cred;
-          } else {
-            throw linkErr; // それ以外は上位 catch へ
-          }
+    if (_currentUser?.isAnonymous) {
+      try {
+        await _currentUser.linkWithPopup(provider);
+        showToast('Googleアカウントと連携しました！データを引き継ぎました');
+      } catch (linkErr) {
+        // 既存の実アカウントと同じGoogleアカウントを選択した場合は
+        // linkWithPopup が失敗するので、通常のサインインにフォールバック。
+        // credential-already-in-use: e.credential が取れる場合はそれを使う
+        // account-exists-with-different-credential: e.credential がない場合も想定
+        if (linkErr.code === 'auth/credential-already-in-use' ||
+            linkErr.code === 'auth/account-exists-with-different-credential') {
+          const cred = linkErr.credential
+            ? _auth.signInWithCredential(linkErr.credential)
+            : _auth.signInWithPopup(provider);
+          await cred;
+        } else if (_shouldFallbackToRedirect(linkErr)) {
+          await _currentUser.linkWithRedirect(provider);
+          return { ok: true };
+        } else {
+          throw linkErr; // それ以外は上位 catch へ
         }
-      } else {
-        await _auth.signInWithPopup(provider);
       }
-      closeAuthModal();
-      return { ok: true };
+    } else {
+      try {
+        await _auth.signInWithPopup(provider);
+      } catch (popupErr) {
+        if (_shouldFallbackToRedirect(popupErr)) {
+          await _auth.signInWithRedirect(provider);
+          return { ok: true };
+        }
+        throw popupErr;
+      }
     }
+    closeAuthModal();
+    return { ok: true };
   } catch (e) {
     // Redirect 経由・その他で credential-already-in-use が来た場合のフォールバック
     if ((e.code === 'auth/credential-already-in-use' ||
