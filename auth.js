@@ -127,9 +127,17 @@ async function signInWithGoogle() {
       return { ok: true };
     }
   } catch (e) {
-    // 既に別アカウントが存在する場合
-    if (e.code === 'auth/credential-already-in-use' || e.code === 'auth/email-already-in-use') {
-      return { error: 'このGoogleアカウントは既に登録されています。ログインしてください。' };
+    // 匿名ユーザーが linkWithPopup/linkWithRedirect を試みた際に
+    // 選択したGoogleアカウントが既存アカウントと紐づいている場合、
+    // エラーに含まれる credential でそのままサインインし直す。
+    if (e.code === 'auth/credential-already-in-use' && e.credential) {
+      try {
+        await _auth.signInWithCredential(e.credential);
+        closeAuthModal();
+        return { ok: true };
+      } catch (e2) {
+        return { error: _authErrorMsg(e2) };
+      }
     }
     return { error: _authErrorMsg(e) };
   }
