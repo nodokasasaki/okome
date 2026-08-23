@@ -148,6 +148,13 @@ async function downloadCloudDataToLocal(uid) {
 // ----------------------------------------------------------------
 const _unsubscribers = [];
 
+// onSnapshot コールバック内で DB.set を呼ぶと extendDBWithCloud 経由で
+// Firestore へ再書き込みが走り、それが再度 onSnapshot を発火させる
+// 無限ループを防ぐため、リスナー内では localStorage へ直書きする専用関数を使う。
+function _localSet(k, v) {
+  try { localStorage.setItem(k, JSON.stringify(v)); } catch {}
+}
+
 function startRealtimeSync(uid) {
   if (!_db || !uid) return;
   stopRealtimeSync(); // 二重登録を防ぐ
@@ -156,8 +163,7 @@ function startRealtimeSync(uid) {
   _unsubscribers.push(
     _userCol(uid, 'tasks').onSnapshot(snap => {
       if (snap.metadata.hasPendingWrites) return; // 自分の書き込みは無視
-      const tasks = snap.docs.map(d => d.data());
-      DB.set(DB.K.tasks, tasks);
+      _localSet(DB.K.tasks, snap.docs.map(d => d.data()));
       renderCalendar?.();
       renderTaskList?.();
     }, err => console.warn('[Sync] tasks:', err))
@@ -167,8 +173,7 @@ function startRealtimeSync(uid) {
   _unsubscribers.push(
     _userCol(uid, 'logs').onSnapshot(snap => {
       if (snap.metadata.hasPendingWrites) return;
-      const logs = snap.docs.map(d => d.data());
-      DB.set(DB.K.logs, logs);
+      _localSet(DB.K.logs, snap.docs.map(d => d.data()));
       renderCalendar?.();
     }, err => console.warn('[Sync] logs:', err))
   );
@@ -177,8 +182,7 @@ function startRealtimeSync(uid) {
   _unsubscribers.push(
     _userCol(uid, 'period_days').onSnapshot(snap => {
       if (snap.metadata.hasPendingWrites) return;
-      const periods = snap.docs.map(d => d.data());
-      DB.set(DB.K.period_days, periods);
+      _localSet(DB.K.period_days, snap.docs.map(d => d.data()));
       renderPeriod?.();
     }, err => console.warn('[Sync] period_days:', err))
   );
@@ -189,11 +193,11 @@ function startRealtimeSync(uid) {
       if (snap.metadata.hasPendingWrites) return;
       if (!snap.exists) return;
       const meta = snap.data();
-      if (meta.settings)                       DB.set(DB.K.settings, meta.settings);
-      if (meta.unlocked)                       DB.set(DB.K.unlocked, meta.unlocked);
-      if (meta.tutorial_cleared !== undefined) DB.set(DB.K.tutorial_cleared, meta.tutorial_cleared);
-      if (meta.dismissed_suggest)             DB.set(DB.K.dismissed_suggest, meta.dismissed_suggest);
-      if (meta.title_shown)                   DB.set(DB.K.title_shown, meta.title_shown);
+      if (meta.settings          != null) _localSet(DB.K.settings,          meta.settings);
+      if (meta.unlocked          != null) _localSet(DB.K.unlocked,          meta.unlocked);
+      if (meta.tutorial_cleared  != null) _localSet(DB.K.tutorial_cleared,  meta.tutorial_cleared);
+      if (meta.dismissed_suggest != null) _localSet(DB.K.dismissed_suggest, meta.dismissed_suggest);
+      if (meta.title_shown       != null) _localSet(DB.K.title_shown,       meta.title_shown);
       // tutorial_cleared が変わると画面表示が変わるため再描画
       renderCalendar?.();
     }, err => console.warn('[Sync] meta:', err))
@@ -228,17 +232,36 @@ function extendDBWithCloud() {
   };
 }
 
+// localStorage の現在値と比較して削除されたIDを特定するヘルパー
+function _findDeletedIds(storageKey, newItems, idField) {
+  try {
+    const prev = JSON.parse(localStorage.getItem(storageKey)) || [];
+    const newSet = new Set(newItems.map(i => String(i[idField])));
+    return prev
+      .map(i => String(i[idField]))
+      .filter(id => !newSet.has(id));
+  } catch {
+    return null; // 取得失敗時は全件 get() にフォールバック
+  }
+}
+
 async function _cloudWrite(uid, k, v) {
   switch (k) {
-    case DB.K.tasks:
-      await _syncCollection(uid, 'tasks', v, 'id');
+    case DB.K.tasks: {
+      const deletedIds = _findDeletedIds(DB.K.tasks, v, 'id');
+      await _syncCollection(uid, 'tasks', v, 'id', deletedIds);
       break;
-    case DB.K.logs:
-      await _syncCollection(uid, 'logs', v, 'id');
+    }
+    case DB.K.logs: {
+      const deletedIds = _findDeletedIds(DB.K.logs, v, 'id');
+      await _syncCollection(uid, 'logs', v, 'id', deletedIds);
       break;
-    case DB.K.period_days:
-      await _syncCollection(uid, 'period_days', v, 'date');
+    }
+    case DB.K.period_days: {
+      const deletedIds = _findDeletedIds(DB.K.period_days, v, 'date');
+      await _syncCollection(uid, 'period_days', v, 'date', deletedIds);
       break;
+    }
     case DB.K.settings:
     case DB.K.tutorial_cleared:
     case DB.K.unlocked:
@@ -253,20 +276,27 @@ async function _cloudWrite(uid, k, v) {
   }
 }
 
-// コレクションを配列データで上書き同期（削除 + 書き込み）
-async function _syncCollection(uid, col, items, idField) {
+// コレクションを配列データで差分同期
+// 毎回全件 get() すると読み取りを大量消費するため、
+// 削除対象は呼び出し元から changedId を受け取って特定し、
+// 変更のあったドキュメントだけ書き込む。
+// 削除が必要な場合（item が渡されない場合）のみ全件 get() を実行する。
+async function _syncCollection(uid, col, items, idField, deletedIds = null) {
   const colRef = _userCol(uid, col);
-  // 既存ドキュメントを取得して不要なものを削除
-  const existing = await colRef.get();
-  const existingIds = new Set(existing.docs.map(d => d.id));
-  const newIds = new Set(items.map(i => String(i[idField])));
+  const batch  = _db.batch();
 
-  const batch = _db.batch();
-  // 削除（新配列に無いもの）
-  existing.docs.forEach(doc => {
-    if (!newIds.has(doc.id)) batch.delete(doc.ref);
-  });
-  // 追加・更新
+  if (deletedIds && deletedIds.length > 0) {
+    // 削除対象が明示されている場合は全件 get() せずに直接削除
+    deletedIds.forEach(id => batch.delete(colRef.doc(String(id))));
+  } else if (deletedIds === null) {
+    // deletedIds が null（不明）の場合のみ全件 get() で差分を取る
+    const existing = await colRef.get();
+    const newIds   = new Set(items.map(i => String(i[idField])));
+    existing.docs.forEach(doc => {
+      if (!newIds.has(doc.id)) batch.delete(doc.ref);
+    });
+  }
+  // 追加・更新（全アイテムを書き込む）
   items.forEach(item => {
     batch.set(colRef.doc(String(item[idField])), item);
   });

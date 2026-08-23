@@ -2776,8 +2776,8 @@ onAuthReady(async user => {
       // 実アカウントでログイン済み → クラウドデータを同期
       await onUserSignedIn(user);
     } else if (user && user.isAnonymous) {
-      // 匿名ログイン済み → リアルタイム同期だけ開始（データ上書きしない）
-      startRealtimeSync?.(user.uid);
+      // 匿名ログイン済み → リアルタイム同期は不要（単独デバイス利用のため）
+      // startRealtimeSync は実アカウントのみで使用する
       renderCalendar?.();
       renderTaskList?.();
       renderSettings?.();
