@@ -52,67 +52,53 @@ function initAuth() {
     // スマホ Redirect ログイン対応
     //
     // 設計：
-    //   getRedirectResult() を先に呼び出して Promise を保持しておく。
-    //   onAuthStateChanged の初回コールバック時にその Promise を await してから
-    //   onAuthReady を発火する。
-    //
-    // なぜ onAuthStateChanged を async にしないか：
-    //   async にすると Redirect 復帰時に onAuthStateChanged が複数回発火する
-    //   （null → 実ユーザーの順）。await 中に2回目が来て _currentUser が
-    //   null に戻る競合が起きるため、Promise を外で保持して1回だけ await する。
+    //   getRedirectResult() の完了を待ってから onAuthStateChanged を登録する。
+    //   これにより Redirect 復帰時の「null→実ユーザー」2回発火の競合を完全に回避する。
+    //   Redirect なし（通常起動）の場合は getRedirectResult が即座に
+    //   { user: null } で resolve するため遅延はほぼゼロ。
     // ----------------------------------------------------------------
-    const _redirectPromise = _auth.getRedirectResult().then(result => {
-      if (result.user) {
-        // Redirect 成功：_currentUser を実アカウントに更新
-        _currentUser = result.user;
-        const wasAnon = result.additionalUserInfo?.isNewUser === false;
+    _auth.getRedirectResult().then(redirectResult => {
+      // Redirect ログイン成功時：_currentUser を実アカウントに更新
+      if (redirectResult.user) {
+        _currentUser = redirectResult.user;
+        const wasAnon = redirectResult.additionalUserInfo?.isNewUser === false;
         if (wasAnon) showToast('Googleアカウントと連携しました！データを引き継ぎました');
         closeAuthModal();
-        console.log('[Auth] Redirect ログイン成功:', result.user.uid);
+        console.log('[Auth] Redirect ログイン成功:', redirectResult.user.uid);
       }
-      return result.user || null;
     }).catch(err => {
       if (err.code && err.code !== 'auth/no-auth-event') {
         console.warn('[Auth] getRedirectResult エラー:', err.code, err.message);
-        // モーダルが表示されている場合のみエラーを表示
-        const errEl = document.getElementById('auth-error-login');
-        if (errEl && !document.getElementById('modal-auth')?.classList.contains('hidden')) {
-          errEl.textContent = _authErrorMsg(err);
-          errEl.style.display = 'block';
-        }
       }
-      return null;
-    });
+    }).finally(() => {
+      // getRedirectResult の完了（成功・失敗問わず）後に onAuthStateChanged を登録する。
+      // これにより Redirect 復帰後は _currentUser が確定した状態でリスナーが起動する。
+      _auth.onAuthStateChanged(user => {
+        const prevUid = _currentUser?.uid || null;
 
-    // 認証状態の変化を監視（同期関数のまま）
-    _auth.onAuthStateChanged(user => {
-      const prevUid = _currentUser?.uid || null;
+        // Redirect 成功時は _currentUser が既に実アカウントに設定済みなので
+        // onAuthStateChanged の user（null の可能性あり）で上書きしない
+        if (!_currentUser) _currentUser = user;
 
-      if (!_authReady) {
-        // 初回コールバック：getRedirectResult の完了を待ってから onAuthReady を発火する
-        // _redirectPromise は既に起動済みのため、ここで await せず .then() でつなぐ
-        _redirectPromise.then(() => {
-          // _currentUser は getRedirectResult の .then() 内で更新済みの可能性があるため
-          // ここでは上書きしない（null でも実ユーザーでも現状を維持）
-          if (!_currentUser && user) _currentUser = user; // redirect なし の場合は onAuthStateChanged の user を使う
-
+        if (!_authReady) {
+          // 初回：onAuthReady を発火
           _authReady = true;
           _authReadyCallbacks.forEach(cb => cb(_currentUser));
           _authReadyCallbacks = [];
           updateAuthUI(_currentUser);
-        });
-      } else {
-        // 2回目以降
-        _currentUser = user;
-        if (user && user.uid !== prevUid) {
-          // 再ログイン（匿名→実アカウント等）：クラウド同期を再実行
-          onUserSignedIn?.(user);
-        } else if (!user && prevUid) {
-          // ログアウト：リアルタイム同期を停止
-          stopRealtimeSync?.();
+        } else {
+          // 2回目以降（再ログイン・ログアウト）
+          _currentUser = user;
+          if (user && user.uid !== prevUid) {
+            // 再ログイン（匿名→実アカウント等）：クラウド同期を再実行
+            onUserSignedIn?.(user);
+          } else if (!user && prevUid) {
+            // ログアウト：リアルタイム同期を停止
+            stopRealtimeSync?.();
+          }
+          updateAuthUI(_currentUser);
         }
-        updateAuthUI(_currentUser);
-      }
+      });
     });
   } catch (e) {
     console.error('[Auth] 初期化失敗:', e);
