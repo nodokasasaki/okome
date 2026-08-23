@@ -118,8 +118,24 @@ async function signInWithGoogle() {
     } else {
       // PC / PWA（ホーム画面追加）：ポップアップを使う
       if (_currentUser?.isAnonymous) {
-        await _currentUser.linkWithPopup(provider);
-        showToast('Googleアカウントと連携しました！データを引き継ぎました');
+        try {
+          await _currentUser.linkWithPopup(provider);
+          showToast('Googleアカウントと連携しました！データを引き継ぎました');
+        } catch (linkErr) {
+          // 既存の実アカウントと同じGoogleアカウントを選択した場合は
+          // linkWithPopup が失敗するので、通常のサインインにフォールバック。
+          // credential-already-in-use: e.credential が取れる場合はそれを使う
+          // account-exists-with-different-credential: e.credential がない場合も想定
+          if (linkErr.code === 'auth/credential-already-in-use' ||
+              linkErr.code === 'auth/account-exists-with-different-credential') {
+            const cred = linkErr.credential
+              ? _auth.signInWithCredential(linkErr.credential)
+              : _auth.signInWithPopup(provider);
+            await cred;
+          } else {
+            throw linkErr; // それ以外は上位 catch へ
+          }
+        }
       } else {
         await _auth.signInWithPopup(provider);
       }
@@ -127,10 +143,9 @@ async function signInWithGoogle() {
       return { ok: true };
     }
   } catch (e) {
-    // 匿名ユーザーが linkWithPopup/linkWithRedirect を試みた際に
-    // 選択したGoogleアカウントが既存アカウントと紐づいている場合、
-    // エラーに含まれる credential でそのままサインインし直す。
-    if (e.code === 'auth/credential-already-in-use' && e.credential) {
+    // Redirect 経由・その他で credential-already-in-use が来た場合のフォールバック
+    if ((e.code === 'auth/credential-already-in-use' ||
+         e.code === 'auth/account-exists-with-different-credential') && e.credential) {
       try {
         await _auth.signInWithCredential(e.credential);
         closeAuthModal();
@@ -218,16 +233,18 @@ async function signOut() {
 // ----------------------------------------------------------------
 function _authErrorMsg(e) {
   const map = {
-    'auth/user-not-found':         'メールアドレスが見つかりません',
-    'auth/wrong-password':         'パスワードが間違っています',
-    'auth/invalid-email':          'メールアドレスの形式が正しくありません',
-    'auth/email-already-in-use':   'このメールアドレスは既に使われています',
-    'auth/weak-password':          'パスワードは6文字以上にしてください',
-    'auth/too-many-requests':      'しばらく時間をおいてから再試行してください',
-    'auth/popup-closed-by-user':   'ログインをキャンセルしました',
-    'auth/popup-blocked':          'ポップアップがブロックされました。ブラウザの設定をご確認ください',
-    'auth/network-request-failed': 'ネットワークエラーが発生しました',
-    'auth/invalid-credential':     'メールアドレスまたはパスワードが正しくありません',
+    'auth/user-not-found':                          'メールアドレスが見つかりません',
+    'auth/wrong-password':                          'パスワードが間違っています',
+    'auth/invalid-email':                           'メールアドレスの形式が正しくありません',
+    'auth/email-already-in-use':                    'このメールアドレスは既に使われています',
+    'auth/weak-password':                           'パスワードは6文字以上にしてください',
+    'auth/too-many-requests':                       'しばらく時間をおいてから再試行してください',
+    'auth/popup-closed-by-user':                    'ログインをキャンセルしました',
+    'auth/popup-blocked':                           'ポップアップがブロックされました。ブラウザの設定をご確認ください',
+    'auth/network-request-failed':                  'ネットワークエラーが発生しました',
+    'auth/invalid-credential':                      'メールアドレスまたはパスワードが正しくありません',
+    'auth/credential-already-in-use':               'このGoogleアカウントは別の方法でログインしてください',
+    'auth/account-exists-with-different-credential':'このGoogleアカウントは既に登録済みです。再度ログインをお試しください',
   };
   return map[e.code] || `エラーが発生しました（${e.code || e.message}）`;
 }
