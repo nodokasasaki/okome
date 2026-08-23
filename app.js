@@ -424,7 +424,15 @@ function checkShareURLOnLoad() {
         const anonNote = document.querySelector('.auth-anon-note');
         if (anonNote) anonNote.style.display = 'none';
 
+        // 実アカウントでログインするまで最大2分（150回 × 800ms）待つ
+        let _retryCount = 0;
         const _retry = setInterval(async () => {
+          _retryCount++;
+          // タイムアウト（2分経過）またはログイン済みなら終了
+          if (_retryCount > 150) {
+            clearInterval(_retry);
+            return;
+          }
           // 実アカウントでログインするまで待つ（匿名は除外）
           if (!getUserId() || isAnonymous()) return;
           clearInterval(_retry);
@@ -2789,10 +2797,8 @@ onAuthReady(async user => {
       // まだ未ログインのままなら匿名ログイン
       if (!firebase.auth().currentUser) {
         try {
-          const result = await firebase.auth().signInAnonymously();
-          if (result.user) {
-            startRealtimeSync?.(result.user.uid);
-          }
+          await firebase.auth().signInAnonymously();
+          // 匿名ユーザーはローカル専用のため startRealtimeSync は呼ばない
         } catch (e) {
           console.warn('[Auth] 匿名ログイン失敗:', e);
         }

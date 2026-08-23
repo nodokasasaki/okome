@@ -117,22 +117,19 @@ async function downloadCloudDataToLocal(uid) {
     }
 
     // tasks
+    // 【問題C修正】empty でも必ず _localSet する。
+    // empty のままにすると initData() が書いた FIRST_TASK が残り、
+    // 次の DB.set 時にクラウドへ意図せず書き込まれるのを防ぐ。
     const tasksSnap = await _userCol(uid, 'tasks').get(opts);
-    if (!tasksSnap.empty) {
-      _localSet(DB.K.tasks, tasksSnap.docs.map(d => d.data()));
-    }
+    _localSet(DB.K.tasks, tasksSnap.docs.map(d => d.data()));
 
-    // logs
+    // logs（同様に空配列で上書きしてローカルの古いデータを排除）
     const logsSnap = await _userCol(uid, 'logs').get(opts);
-    if (!logsSnap.empty) {
-      _localSet(DB.K.logs, logsSnap.docs.map(d => d.data()));
-    }
+    _localSet(DB.K.logs, logsSnap.docs.map(d => d.data()));
 
-    // period_days
+    // period_days（同様に空配列で上書き）
     const periodsSnap = await _userCol(uid, 'period_days').get(opts);
-    if (!periodsSnap.empty) {
-      _localSet(DB.K.period_days, periodsSnap.docs.map(d => d.data()));
-    }
+    _localSet(DB.K.period_days, periodsSnap.docs.map(d => d.data()));
 
     console.log('[DB] クラウドデータをダウンロードしました（サーバー取得）');
     return true;
@@ -159,9 +156,17 @@ function startRealtimeSync(uid) {
   if (!_db || !uid) return;
   stopRealtimeSync(); // 二重登録を防ぐ
 
+  // 【問題B修正】
+  // onSnapshot は登録直後に「初回コールバック」を発火する。
+  // downloadCloudDataToLocal が { source:'server' } で取得した最新データを
+  // localStorage に書いた直後にキャッシュベースの初回コールバックが上書きするのを防ぐため、
+  // 最初の1回だけ _skipFirst フラグで各リスナーの初回コールバックをスキップする。
+  let _skipFirst = { tasks: true, logs: true, period_days: true, meta: true };
+
   // tasks の変化を監視
   _unsubscribers.push(
     _userCol(uid, 'tasks').onSnapshot(snap => {
+      if (_skipFirst.tasks) { _skipFirst.tasks = false; return; }
       if (snap.metadata.hasPendingWrites) return; // 自分の書き込みは無視
       _localSet(DB.K.tasks, snap.docs.map(d => d.data()));
       renderCalendar?.();
@@ -172,6 +177,7 @@ function startRealtimeSync(uid) {
   // logs の変化を監視
   _unsubscribers.push(
     _userCol(uid, 'logs').onSnapshot(snap => {
+      if (_skipFirst.logs) { _skipFirst.logs = false; return; }
       if (snap.metadata.hasPendingWrites) return;
       _localSet(DB.K.logs, snap.docs.map(d => d.data()));
       renderCalendar?.();
@@ -181,6 +187,7 @@ function startRealtimeSync(uid) {
   // period_days の変化を監視
   _unsubscribers.push(
     _userCol(uid, 'period_days').onSnapshot(snap => {
+      if (_skipFirst.period_days) { _skipFirst.period_days = false; return; }
       if (snap.metadata.hasPendingWrites) return;
       _localSet(DB.K.period_days, snap.docs.map(d => d.data()));
       renderPeriod?.();
@@ -188,18 +195,29 @@ function startRealtimeSync(uid) {
   );
 
   // meta（設定等）の変化を監視
+  // 【問題D修正】serverTimestamp の解決により2回コールバックが発火する。
+  // hasPendingWrites が false になる2回目で renderCalendar が余分に呼ばれるのを防ぐため、
+  // フィールド値が実際に変化した場合のみ再描画する。
   _unsubscribers.push(
     _userDoc(uid).onSnapshot(snap => {
+      if (_skipFirst.meta) { _skipFirst.meta = false; return; }
       if (snap.metadata.hasPendingWrites) return;
       if (!snap.exists) return;
       const meta = snap.data();
-      if (meta.settings          != null) _localSet(DB.K.settings,          meta.settings);
-      if (meta.unlocked          != null) _localSet(DB.K.unlocked,          meta.unlocked);
-      if (meta.tutorial_cleared  != null) _localSet(DB.K.tutorial_cleared,  meta.tutorial_cleared);
-      if (meta.dismissed_suggest != null) _localSet(DB.K.dismissed_suggest, meta.dismissed_suggest);
-      if (meta.title_shown       != null) _localSet(DB.K.title_shown,       meta.title_shown);
-      // tutorial_cleared が変わると画面表示が変わるため再描画
-      renderCalendar?.();
+      let changed = false;
+      const applyMeta = (key, storageKey) => {
+        if (meta[key] == null) return;
+        const prev = localStorage.getItem(storageKey);
+        const next = JSON.stringify(meta[key]);
+        if (prev !== next) { _localSet(storageKey, meta[key]); changed = true; }
+      };
+      applyMeta('settings',          DB.K.settings);
+      applyMeta('unlocked',          DB.K.unlocked);
+      applyMeta('tutorial_cleared',  DB.K.tutorial_cleared);
+      applyMeta('dismissed_suggest', DB.K.dismissed_suggest);
+      applyMeta('title_shown',       DB.K.title_shown);
+      // 実際に値が変わった場合のみ再描画
+      if (changed) renderCalendar?.();
     }, err => console.warn('[Sync] meta:', err))
   );
 
@@ -232,34 +250,44 @@ function extendDBWithCloud() {
   };
 }
 
-// localStorage の現在値と比較して削除されたIDを特定するヘルパー
-function _findDeletedIds(storageKey, newItems, idField) {
+// localStorage の現在値と比較して、削除されたIDと変更されたアイテムを特定するヘルパー
+// 戻り値: { deletedIds: string[], changedItems: object[] }
+// パース失敗時は deletedIds=null（呼び出し元でフォールバック処理）
+function _diffItems(storageKey, newItems, idField) {
   try {
-    const prev = JSON.parse(localStorage.getItem(storageKey)) || [];
-    const newSet = new Set(newItems.map(i => String(i[idField])));
-    return prev
-      .map(i => String(i[idField]))
-      .filter(id => !newSet.has(id));
+    const prev    = JSON.parse(localStorage.getItem(storageKey)) || [];
+    const prevMap = new Map(prev.map(i => [String(i[idField]), JSON.stringify(i)]));
+    const newSet  = new Set(newItems.map(i => String(i[idField])));
+
+    const deletedIds   = prev.map(i => String(i[idField])).filter(id => !newSet.has(id));
+    // 新規追加 or JSON が変化したアイテムのみ書き込む
+    const changedItems = newItems.filter(i => {
+      const id = String(i[idField]);
+      return !prevMap.has(id) || prevMap.get(id) !== JSON.stringify(i);
+    });
+
+    return { deletedIds, changedItems };
   } catch {
-    return null; // 取得失敗時は全件 get() にフォールバック
+    // パース失敗時: changedItems=全件 / deletedIds=null（全件 get() フォールバック）
+    return { deletedIds: null, changedItems: newItems };
   }
 }
 
 async function _cloudWrite(uid, k, v) {
   switch (k) {
     case DB.K.tasks: {
-      const deletedIds = _findDeletedIds(DB.K.tasks, v, 'id');
-      await _syncCollection(uid, 'tasks', v, 'id', deletedIds);
+      const { deletedIds, changedItems } = _diffItems(DB.K.tasks, v, 'id');
+      await _syncCollection(uid, 'tasks', changedItems, 'id', deletedIds);
       break;
     }
     case DB.K.logs: {
-      const deletedIds = _findDeletedIds(DB.K.logs, v, 'id');
-      await _syncCollection(uid, 'logs', v, 'id', deletedIds);
+      const { deletedIds, changedItems } = _diffItems(DB.K.logs, v, 'id');
+      await _syncCollection(uid, 'logs', changedItems, 'id', deletedIds);
       break;
     }
     case DB.K.period_days: {
-      const deletedIds = _findDeletedIds(DB.K.period_days, v, 'date');
-      await _syncCollection(uid, 'period_days', v, 'date', deletedIds);
+      const { deletedIds, changedItems } = _diffItems(DB.K.period_days, v, 'date');
+      await _syncCollection(uid, 'period_days', changedItems, 'date', deletedIds);
       break;
     }
     case DB.K.settings:
@@ -273,34 +301,40 @@ async function _cloudWrite(uid, k, v) {
         { merge: true }
       );
       break;
+    case DB.K.partner:
+      // partner はローカル管理専用。Firestore への書き込みは行わない。
+      break;
   }
 }
 
-// コレクションを配列データで差分同期
-// 毎回全件 get() すると読み取りを大量消費するため、
-// 削除対象は呼び出し元から changedId を受け取って特定し、
-// 変更のあったドキュメントだけ書き込む。
-// 削除が必要な場合（item が渡されない場合）のみ全件 get() を実行する。
+// コレクションを差分同期する
+// - deletedIds: 削除対象のID配列。空配列なら削除なし。null なら全件 get() で差分を確認。
+// - items: 追加・更新対象のアイテム（変更があったものだけ渡すこと）
 async function _syncCollection(uid, col, items, idField, deletedIds = null) {
   const colRef = _userCol(uid, col);
   const batch  = _db.batch();
 
-  if (deletedIds && deletedIds.length > 0) {
-    // 削除対象が明示されている場合は全件 get() せずに直接削除
+  if (deletedIds !== null) {
+    // 削除対象が明示されている（空配列を含む）場合は全件 get() しない
     deletedIds.forEach(id => batch.delete(colRef.doc(String(id))));
-  } else if (deletedIds === null) {
-    // deletedIds が null（不明）の場合のみ全件 get() で差分を取る
+  } else {
+    // deletedIds が null（パース失敗）の場合のみ全件 get() で孤立ドキュメントを削除
     const existing = await colRef.get();
+    // items が全件渡されている前提（_diffItems のフォールバックパスでは changedItems=全件）
     const newIds   = new Set(items.map(i => String(i[idField])));
     existing.docs.forEach(doc => {
       if (!newIds.has(doc.id)) batch.delete(doc.ref);
     });
   }
-  // 追加・更新（全アイテムを書き込む）
+
+  // 変更があったアイテムのみ書き込む（items が空なら書き込みゼロ）
   items.forEach(item => {
     batch.set(colRef.doc(String(item[idField])), item);
   });
-  await batch.commit();
+
+  // 書き込みも削除もなければ commit しない（無駄なリクエストを避ける）
+  const hasOps = items.length > 0 || (deletedIds !== null ? deletedIds.length > 0 : true);
+  if (hasOps) await batch.commit();
 }
 
 // DB.K のキー → meta フィールド名の変換
@@ -332,6 +366,13 @@ async function onUserSignedIn(user) {
 
   showSyncStatus('同期中…');
 
+  // 【問題A修正】
+  // 旧実装では finally でリアルタイム同期を開始していたため、
+  // download 失敗時でも startRealtimeSync が走り、ダウンロード失敗の
+  // UI 警告と実際の挙動が矛盾していた。
+  // download / upload が完了した場合のみ startRealtimeSync を呼ぶよう変更。
+  let syncReady = false;
+
   try {
     // null = 判定不能（通信失敗・クォータ超過など）
     // true  = Firestoreにデータあり
@@ -340,25 +381,36 @@ async function onUserSignedIn(user) {
 
     if (hasCloud === null) {
       // 判定不能 → データ破壊リスクを避けるためアップロードもダウンロードもしない
-      // リアルタイム同期のみ開始して、次回の再接続時に再判定する
       console.warn('[DB] クラウドデータ存在確認に失敗。同期をスキップします。');
       showToast('同期できませんでした。ネットワークをご確認ください');
+      // syncReady = false のまま → startRealtimeSync しない
     } else if (hasCloud) {
       // クラウドにデータあり → サーバーから強制ダウンロードして上書き
       const ok = await downloadCloudDataToLocal(uid);
-      if (ok) showToast('同期できました！データを読み込みました');
-      else    showToast('同期に失敗しました。再度お試しください');
+      if (ok) {
+        showToast('同期できました！データを読み込みました');
+        syncReady = true; // download 成功時のみ同期開始
+      } else {
+        showToast('同期に失敗しました。再度お試しください');
+        // syncReady = false のまま → 古いキャッシュで onSnapshot を起動しない
+      }
     } else {
       // クラウドにデータなし（確実に新規ユーザー）→ ローカルをアップロード
       await uploadLocalDataToCloud(uid);
       showToast('データをクラウドに保存しました');
+      syncReady = true; // upload 成功時も同期開始
     }
+  } catch (e) {
+    console.error('[DB] onUserSignedIn 中にエラー:', e);
   } finally {
     _signingInUid = null;
-    // リアルタイム同期を開始
-    startRealtimeSync(uid);
     hideSyncStatus();
-    // 画面を再描画
+    if (syncReady) {
+      // download/upload が成功した場合のみリアルタイム同期を開始する
+      // （初回コールバックは startRealtimeSync 内の _skipFirst で無視される）
+      startRealtimeSync(uid);
+    }
+    // 画面を再描画（syncReady に関わらず最新の localStorage を反映）
     renderCalendar?.();
     renderTaskList?.();
     renderPeriod?.();
