@@ -237,16 +237,23 @@ function extendDBWithCloud() {
   const originalSet = DB.set.bind(DB);
 
   DB.set = function(k, v) {
-    // 常に localStorage に書く（オフライン対応）
-    originalSet(k, v);
-
-    // Firebase 未設定 or 未ログイン時はスキップ
-    if (!_db || !FIREBASE_CONFIGURED) return;
+    // Firebase 未設定 / 未ログイン / 匿名ユーザー時はローカルのみ
+    if (!_db || !FIREBASE_CONFIGURED || isAnonymous?.()) {
+      originalSet(k, v);
+      return;
+    }
     const uid = getUserId?.();
-    if (!uid) return;
+    if (!uid) {
+      originalSet(k, v);
+      return;
+    }
 
-    // キーに対応する Firestore の書き込みを実行（非同期・エラーは握りつぶす）
+    // _diffItems は localStorage の「書き込み前」の値と比較するため、
+    // Firestore への書き込みを先に起動してから localStorage を更新する。
     _cloudWrite(uid, k, v).catch(e => console.warn('[DB] クラウド書き込み失敗:', e));
+
+    // localStorage への書き込み（Firestore 書き込み起動後）
+    originalSet(k, v);
   };
 }
 
