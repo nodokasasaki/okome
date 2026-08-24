@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ouchi-rhythm-v21';
+const CACHE_NAME = 'ouchi-rhythm-v22';
 
 // SW の scope 基準の絶対 URL を生成するヘルパー
 const BASE = self.registration.scope; // 例: https://okome.pages.dev/
