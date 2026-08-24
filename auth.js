@@ -247,6 +247,11 @@ async function sendPasswordReset(email) {
 // 6) ログアウト
 async function signOut() {
   if (!_auth) return;
+  // ログアウト前にローカルストレージのアプリデータを全削除
+  // → 別アカウントでログインしたときに前のユーザーのデータが残らないようにする
+  if (typeof DB !== 'undefined') {
+    Object.values(DB.K).forEach(k => localStorage.removeItem(k));
+  }
   await _auth.signOut();
   showToast('ログアウトしました');
   // ページをリロードして状態をリセット
