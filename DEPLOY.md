@@ -3,9 +3,9 @@
 
 | 環境 | URL | 更新タイミング |
 |------|-----|---------------|
+| **本番環境** | https://ouchirhythm.pages.dev/ | `git push origin main` のたびに自動更新 |
 | **開発環境**（Cloudflare プレビュー） | https://okomedev.pages.dev/ | `git push origin dev` のたびに自動更新 |
-| **本番環境**（Cloudflare Pages） | https://ouchirhythm.pages.dev/ | `git push origin main` のたびに自動更新 |
-| **本番環境**（GitHub Pages） | https://nodokasasaki.github.io/okome/ | `git push origin main` のたびに自動更新 |
+| **ミラー**（GitHub Pages） | https://nodokasasaki.github.io/okome/ | `git push origin main` のたびに自動更新 |
 | **ローカル開発** | http://localhost:8080 | `python3 -m http.server 8080` で手動起動 |
 
 ---
@@ -139,33 +139,46 @@ Firebase コンソール → Authentication → 「設定」タブ → 「承認
 
 | ブランチ | 用途 |
 |----------|------|
-| `main`   | 本番環境（公開用） |
+| `main`   | 本番環境 — https://ouchirhythm.pages.dev/ に自動デプロイ |
 | `dev`    | 開発・作業用（ここで機能追加・修正を行う） |
 
 ---
 
 ## 環境 URL
 
-### 本番環境（GitHub Pages）
-
-```
-https://nodokasasaki.github.io/okome/
-```
-
-> GitHub Pages を有効にしていない場合は以下の手順で設定：
-> GitHub リポジトリ → Settings → Pages → Branch: `main` / `/(root)` → Save
-
----
-
-### 本番環境（Cloudflare Pages）
+### 🟢 本番環境（Cloudflare Pages）
 
 ```
 https://ouchirhythm.pages.dev/
 ```
 
+> `git push origin main` で自動デプロイ（約30秒〜1分で反映）
+
 ---
 
-### 開発環境（ローカルサーバー）
+### 🔵 開発環境（Cloudflare プレビュー）
+
+```
+https://okomedev.pages.dev/
+```
+
+> `git push origin dev` で自動デプロイ。本番を変えずに動作確認する際に使用。
+
+---
+
+### 🪞 ミラー（GitHub Pages）
+
+```
+https://nodokasasaki.github.io/okome/
+```
+
+> `main` push 時に同時反映（約1〜2分）。Cloudflare が主、GitHub Pages は副。
+>
+> GitHub Pages を有効にしていない場合：GitHub リポジトリ → Settings → Pages → Branch: `main` / `/(root)` → Save
+
+---
+
+### 💻 ローカル開発
 
 ```
 http://localhost:8080
@@ -216,29 +229,29 @@ git checkout main
 # 2. dev の変更を取り込む
 git merge dev
 
-# 3. 本番（GitHub Pages & Cloudflare Pages）へプッシュ
+# 3. 本番（https://ouchirhythm.pages.dev/ ほか）へプッシュ
 git push origin main
 
 # 4. 作業用 dev ブランチに戻る
 git checkout dev
 ```
 
-> `git push origin main` 後、GitHub Pages は約1〜2分、Cloudflare Pages は約30秒〜1分で反映されます。
+> `git push origin main` 後、**本番（Cloudflare Pages）は約30秒〜1分**、GitHub Pages ミラーは約1〜2分で反映されます。
 
 ---
 
 ### Cloudflare Pages への反映
 
-> ⚠️ **注意：`main` への push は本番環境に直接反映されます。**
+> ⚠️ **注意：`main` への push は https://ouchirhythm.pages.dev/ に直接反映されます。**
 > `dev` ブランチで確認が取れてから `main` にマージするのが安全な運用です。
 
 ---
 
 #### ブランチと環境の対応
 
-| 操作 | Cloudflare プレビュー | 本番（CF & GH Pages） |
-|------|:---------------------:|:--------------------:|
-| `git push origin dev` | ✅ 反映（プレビューURL） | ❌ 変わらない |
+| 操作 | 開発環境（プレビュー） | 本番（ouchirhythm.pages.dev） |
+|------|:---------------------:|:-----------------------------:|
+| `git push origin dev` | ✅ 反映（okomedev.pages.dev） | ❌ 変わらない |
 | `git push origin main` | — | ✅ 反映 |
 
 - `dev` を push すると Cloudflare が自動でプレビュー URL を発行します
@@ -328,7 +341,7 @@ git log --oneline -10
 | コミット | `git commit -m "メッセージ"` |
 | dev にプッシュ | `git push origin dev` |
 | dev を Cloudflare プレビューに反映 | `git push origin dev` |
-| main にマージして本番公開（CF & GH Pages） | `git checkout main && git merge dev && git push origin main && git checkout dev` |
+| main にマージして本番公開（ouchirhythm.pages.dev） | `git checkout main && git merge dev && git push origin main && git checkout dev` |
 | Wrangler で本番に直接アップロード | `wrangler pages deploy . --project-name=ouchirhythm` |
 | Wrangler でプレビューにだけ上げる | `wrangler pages deploy . --project-name=ouchirhythm --branch=dev` |
 | ブランチ確認 | `git branch` |
