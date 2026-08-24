@@ -3072,3 +3072,51 @@ onAuthReady(async user => {
     pullDist = 0;
   });
 })();
+
+/* ================================================================
+   Bottom Nav — スクロールで自動非表示（スマホのみ）
+   ================================================================ */
+(function () {
+  const nav = document.querySelector('.bottom-nav');
+  if (!nav) return;
+
+  const HIDE_THRESHOLD = 60;   // これ以上スクロールダウンしたら隠す
+  const SHOW_BUFFER    = 10;   // 上に少し戻ったら即表示
+  const TOP_GUARD      = 80;   // ページ上端付近は常に表示
+
+  let lastY = 0;
+  let ticking = false;
+
+  function onScroll() {
+    if (ticking) return;
+    ticking = true;
+    requestAnimationFrame(() => {
+      // PC（768px以上）ではサイドバーなので何もしない
+      if (window.innerWidth >= 768) {
+        nav.classList.remove('nav--hidden');
+        lastY = window.scrollY;
+        ticking = false;
+        return;
+      }
+
+      const currentY = window.scrollY;
+      const delta    = currentY - lastY;
+
+      if (currentY < TOP_GUARD) {
+        // ページ最上部付近は常に表示
+        nav.classList.remove('nav--hidden');
+      } else if (delta > HIDE_THRESHOLD) {
+        // 大きく下にスクロール → 隠す
+        nav.classList.add('nav--hidden');
+      } else if (delta < -SHOW_BUFFER) {
+        // 少しでも上にスクロール → 表示
+        nav.classList.remove('nav--hidden');
+      }
+
+      lastY = currentY;
+      ticking = false;
+    });
+  }
+
+  window.addEventListener('scroll', onScroll, { passive: true });
+})();

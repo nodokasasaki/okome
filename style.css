@@ -128,6 +128,10 @@ html, body {
   border-top: 1px solid var(--border);
   display: flex; z-index: 200;
   box-shadow: 0 -2px 12px rgba(30,80,50,.08);
+  transition: transform .25s ease;
+}
+.bottom-nav.nav--hidden {
+  transform: translateX(-50%) translateY(100%);
 }
 .nav-item {
   flex: 1; display: flex; flex-direction: column;
@@ -692,6 +696,7 @@ svg { display: block; }
     height: 100vh;
     max-width: 220px;
     transform: none;
+    transition: none;
     flex-direction: column;
     justify-content: flex-start;
     padding: 0;
@@ -702,6 +707,9 @@ svg { display: block; }
     z-index: 300;
     gap: 0;
     overflow-y: auto;
+  }
+  .bottom-nav.nav--hidden {
+    transform: none;
   }
 
   /* サイドバーロゴ */
