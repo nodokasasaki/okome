@@ -39,7 +39,7 @@ function _shouldFallbackToRedirect(err) {
 // ----------------------------------------------------------------
 // 初期化
 // ----------------------------------------------------------------
-function initAuth() {
+async function initAuth() {
   if (!FIREBASE_CONFIGURED) {
     // Firebase 未設定時はローカルモードとして即座に ready 扱い
     _authReady = true;
@@ -60,36 +60,32 @@ function initAuth() {
     _auth.languageCode = 'ja';
 
     // ----------------------------------------------------------------
-    // セッション永続化（スマホでアプリを閉じてもログイン状態を維持）
-    // デフォルトは LOCAL だが、スマホブラウザ・PWA 環境では明示指定が必要。
-    // setPersistence は非同期だが、完了前に onAuthStateChanged が
-    // 走っても問題ないため await せず then チェーンで続行する。
+    // 【重要】setPersistence → getRedirectResult → onAuthStateChanged の順序を厳守する
+    //
+    // setPersistence を必ず await してから getRedirectResult を呼ぶ。
+    // 通常ブラウザには既存の IndexedDB（Firebase Auth の内部ストレージ）が残っており、
+    // setPersistence が IndexedDB の移行処理を完了する前に getRedirectResult を呼ぶと
+    // Redirect ログイン後の戻り情報がストレージから読み取れず消失する。
+    // プライベートブラウザは IndexedDB が毎回空なので setPersistence が即座に完了し
+    // この競合が起きない → 「プライベートは成功・通常は失敗」の根本原因だった。
     // ----------------------------------------------------------------
-    _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => {
+    await _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => {
       console.warn('[Auth] setPersistence 失敗（無視して続行）:', e.code);
     });
 
-    // ----------------------------------------------------------------
-    // スマホ Redirect ログイン対応
-    //
-    // 設計：
-    //   getRedirectResult() の完了を待ってから onAuthStateChanged を登録する。
-    //   これにより Redirect 復帰時の「null→実ユーザー」2回発火の競合を完全に回避する。
-    //   Redirect なし（通常起動）の場合は getRedirectResult が即座に
-    //   { user: null } で resolve するため遅延はほぼゼロ。
-    // ----------------------------------------------------------------
-    _auth.getRedirectResult().then(redirectResult => {
-      // Redirect ログイン成功時：_currentUser を実アカウントに更新
+    let redirectUser = null;
+    try {
+      const redirectResult = await _auth.getRedirectResult();
       if (redirectResult.user) {
+        redirectUser = redirectResult.user;
         _currentUser = redirectResult.user;
         const wasAnon = redirectResult.additionalUserInfo?.isNewUser === false;
         if (wasAnon) showToast('Googleアカウントと連携しました！データを引き継ぎました');
         closeAuthModal();
         console.log('[Auth] Redirect ログイン成功:', redirectResult.user.uid);
       }
-    }).catch(err => {
-      // Safari ITP により sessionStorage が消えた場合など
-      // 無視してよいエラーコードは警告を出さない
+    } catch (err) {
+      // Safari ITP により sessionStorage が消えた場合など無視してよいエラー
       const silentCodes = [
         'auth/no-auth-event',
         'auth/null-user',
@@ -99,44 +95,44 @@ function initAuth() {
       if (err.code && !silentCodes.includes(err.code)) {
         console.warn('[Auth] getRedirectResult エラー:', err.code, err.message);
       }
-    }).finally(() => {
-      // getRedirectResult の完了（成功・失敗問わず）後に onAuthStateChanged を登録する。
-      // これにより Redirect 復帰後は _currentUser が確定した状態でリスナーが起動する。
-      _auth.onAuthStateChanged(user => {
-        const prevUid      = _currentUser?.uid      || null;
-        const prevIsAnon   = _currentUser?.isAnonymous ?? true;
+    }
 
-        // Redirect 成功時は _currentUser が既に実アカウントに設定済みなので
-        // onAuthStateChanged の user（null の可能性あり）で上書きしない
-        if (!_currentUser) _currentUser = user;
+    // getRedirectResult 完了後に onAuthStateChanged を登録する。
+    // これにより Redirect 復帰時の「null→実ユーザー」2回発火の競合を完全に回避する。
+    _auth.onAuthStateChanged(user => {
+      const prevUid      = _currentUser?.uid      || null;
+      const prevIsAnon   = _currentUser?.isAnonymous ?? true;
 
-        if (!_authReady) {
-          // 初回：onAuthReady を発火
-          _authReady = true;
-          _authReadyCallbacks.forEach(cb => cb(_currentUser));
-          _authReadyCallbacks = [];
-          updateAuthUI(_currentUser);
-          // 初回コールバック時にすでに実ユーザーがいる場合（通常ブラウザでのリロード等）も
-          // クラウド同期を起動する（プライベートモードとの動作差を解消）
-          if (_currentUser && !_currentUser.isAnonymous) {
-            onUserSignedIn?.(_currentUser);
-          }
-        } else {
-          // 2回目以降（再ログイン・ログアウト）
-          _currentUser = user;
-          if (user && (
-            user.uid !== prevUid ||
-            // 同一 uid でも匿名→実アカウントへ昇格した場合（linkWithPopup）は同期を起動する
-            (prevIsAnon && !user.isAnonymous)
-          )) {
-            onUserSignedIn?.(user);
-          } else if (!user && prevUid) {
-            // ログアウト：リアルタイム同期を停止
-            stopRealtimeSync?.();
-          }
-          updateAuthUI(_currentUser);
+      // Redirect 成功時は _currentUser が既に実アカウントに設定済みなので
+      // onAuthStateChanged の user（null の可能性あり）で上書きしない
+      if (!_currentUser) _currentUser = user;
+
+      if (!_authReady) {
+        // 初回：onAuthReady を発火
+        _authReady = true;
+        _authReadyCallbacks.forEach(cb => cb(_currentUser));
+        _authReadyCallbacks = [];
+        updateAuthUI(_currentUser);
+        // 初回コールバック時にすでに実ユーザーがいる場合（通常ブラウザのリロード等）も
+        // クラウド同期を起動する（プライベートモードとの動作差を解消）
+        if (_currentUser && !_currentUser.isAnonymous) {
+          onUserSignedIn?.(_currentUser);
         }
-      });
+      } else {
+        // 2回目以降（再ログイン・ログアウト）
+        _currentUser = user;
+        if (user && (
+          user.uid !== prevUid ||
+          // 同一 uid でも匿名→実アカウントへ昇格した場合（linkWithPopup）は同期を起動する
+          (prevIsAnon && !user.isAnonymous)
+        )) {
+          onUserSignedIn?.(user);
+        } else if (!user && prevUid) {
+          // ログアウト：リアルタイム同期を停止
+          stopRealtimeSync?.();
+        }
+        updateAuthUI(_currentUser);
+      }
     });
   } catch (e) {
     console.error('[Auth] 初期化失敗:', e);
