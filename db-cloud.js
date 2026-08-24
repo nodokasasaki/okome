@@ -27,7 +27,15 @@ function initFirestore() {
   try {
     _db = firebase.firestore();
     // オフラインキャッシュを有効にする（PWA 対応）
-    _db.enablePersistence({ synchronizeTabs: true }).catch(() => {});
+    _db.enablePersistence({ synchronizeTabs: true }).catch(e => {
+      // Safari は synchronizeTabs 非対応 → タブなし設定でリトライ
+      if (e.code === 'failed-precondition') {
+        console.warn('[DB] enablePersistence: 複数タブ競合、synchronizeTabs なしで再試行');
+        _db.enablePersistence().catch(() => {});
+      } else if (e.code === 'unimplemented') {
+        console.warn('[DB] enablePersistence: このブラウザは非対応（Safari プライベート等）');
+      }
+    });
   } catch (e) {
     console.error('[DB] Firestore 初期化失敗:', e);
   }

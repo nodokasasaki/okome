@@ -93,6 +93,11 @@ function initAuth() {
           _authReadyCallbacks.forEach(cb => cb(_currentUser));
           _authReadyCallbacks = [];
           updateAuthUI(_currentUser);
+          // 初回コールバック時にすでに実ユーザーがいる場合（通常ブラウザでのリロード等）も
+          // クラウド同期を起動する（プライベートモードとの動作差を解消）
+          if (_currentUser && !_currentUser.isAnonymous) {
+            onUserSignedIn?.(_currentUser);
+          }
         } else {
           // 2回目以降（再ログイン・ログアウト）
           _currentUser = user;
@@ -247,6 +252,11 @@ async function sendPasswordReset(email) {
 // 6) ログアウト
 async function signOut() {
   if (!_auth) return;
+  // ログアウト前にローカルストレージのアプリデータを全削除
+  // → 別アカウントでログインしたときに前のユーザーのデータが残らないようにする
+  if (typeof DB !== 'undefined') {
+    Object.values(DB.K).forEach(k => localStorage.removeItem(k));
+  }
   await _auth.signOut();
   showToast('ログアウトしました');
   // ページをリロードして状態をリセット
