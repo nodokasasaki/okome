@@ -46,6 +46,16 @@ function initAuth() {
     _auth.languageCode = 'ja';
 
     // ----------------------------------------------------------------
+    // セッション永続化（スマホでアプリを閉じてもログイン状態を維持）
+    // デフォルトは LOCAL だが、スマホブラウザ・PWA 環境では明示指定が必要。
+    // setPersistence は非同期だが、完了前に onAuthStateChanged が
+    // 走っても問題ないため await せず then チェーンで続行する。
+    // ----------------------------------------------------------------
+    _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => {
+      console.warn('[Auth] setPersistence 失敗（無視して続行）:', e.code);
+    });
+
+    // ----------------------------------------------------------------
     // スマホ Redirect ログイン対応
     //
     // 設計：
