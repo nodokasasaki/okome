@@ -81,7 +81,8 @@ function initAuth() {
       // getRedirectResult の完了（成功・失敗問わず）後に onAuthStateChanged を登録する。
       // これにより Redirect 復帰後は _currentUser が確定した状態でリスナーが起動する。
       _auth.onAuthStateChanged(user => {
-        const prevUid = _currentUser?.uid || null;
+        const prevUid      = _currentUser?.uid      || null;
+        const prevIsAnon   = _currentUser?.isAnonymous ?? true;
 
         // Redirect 成功時は _currentUser が既に実アカウントに設定済みなので
         // onAuthStateChanged の user（null の可能性あり）で上書きしない
@@ -101,8 +102,11 @@ function initAuth() {
         } else {
           // 2回目以降（再ログイン・ログアウト）
           _currentUser = user;
-          if (user && user.uid !== prevUid) {
-            // 再ログイン（匿名→実アカウント等）：クラウド同期を再実行
+          if (user && (
+            user.uid !== prevUid ||
+            // 同一 uid でも匿名→実アカウントへ昇格した場合（linkWithPopup）は同期を起動する
+            (prevIsAnon && !user.isAnonymous)
+          )) {
             onUserSignedIn?.(user);
           } else if (!user && prevUid) {
             // ログアウト：リアルタイム同期を停止

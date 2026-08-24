@@ -368,24 +368,26 @@ function _metaField(k) {
 // ログイン後の初期化フロー
 // ----------------------------------------------------------------
 
-// 同一 UID で二重実行を防ぐフラグ
-let _signingInUid = null;
+// 同一 UID の同期処理が進行中の場合にその Promise を保持する。
+// 文字列フラグではなく Promise を保持することで、
+// 「二重呼び出し時は既存の Promise を返す」→ finally が必ず実行される を保証する。
+const _signingInPromises = {};
 
-async function onUserSignedIn(user) {
-  if (!_db) return;
+function onUserSignedIn(user) {
+  if (!_db) return Promise.resolve();
   const uid = user.uid;
 
-  // 同一 UID での二重実行を防ぐ（匿名→Google 昇格後の二重呼び出し対策）
-  if (_signingInUid === uid) return;
-  _signingInUid = uid;
+  // 同一 UID の処理が既に進行中ならその Promise を返す（finally は元の呼び出しで実行済み）
+  if (_signingInPromises[uid]) return _signingInPromises[uid];
 
+  _signingInPromises[uid] = _doUserSignedIn(uid).finally(() => {
+    delete _signingInPromises[uid];
+  });
+  return _signingInPromises[uid];
+}
+
+async function _doUserSignedIn(uid) {
   showSyncStatus('同期中…');
-
-  // 【問題A修正】
-  // 旧実装では finally でリアルタイム同期を開始していたため、
-  // download 失敗時でも startRealtimeSync が走り、ダウンロード失敗の
-  // UI 警告と実際の挙動が矛盾していた。
-  // download / upload が完了した場合のみ startRealtimeSync を呼ぶよう変更。
   let syncReady = false;
 
   try {
@@ -398,31 +400,26 @@ async function onUserSignedIn(user) {
       // 判定不能 → データ破壊リスクを避けるためアップロードもダウンロードもしない
       console.warn('[DB] クラウドデータ存在確認に失敗。同期をスキップします。');
       showToast('同期できませんでした。ネットワークをご確認ください');
-      // syncReady = false のまま → startRealtimeSync しない
     } else if (hasCloud) {
       // クラウドにデータあり → サーバーから強制ダウンロードして上書き
       const ok = await downloadCloudDataToLocal(uid);
       if (ok) {
         showToast('同期できました！データを読み込みました');
-        syncReady = true; // download 成功時のみ同期開始
+        syncReady = true;
       } else {
         showToast('同期に失敗しました。再度お試しください');
-        // syncReady = false のまま → 古いキャッシュで onSnapshot を起動しない
       }
     } else {
       // クラウドにデータなし（確実に新規ユーザー）→ ローカルをアップロード
       await uploadLocalDataToCloud(uid);
       showToast('データをクラウドに保存しました');
-      syncReady = true; // upload 成功時も同期開始
+      syncReady = true;
     }
   } catch (e) {
     console.error('[DB] onUserSignedIn 中にエラー:', e);
   } finally {
-    _signingInUid = null;
     hideSyncStatus();
     if (syncReady) {
-      // download/upload が成功した場合のみリアルタイム同期を開始する
-      // （初回コールバックは startRealtimeSync 内の _skipFirst で無視される）
       startRealtimeSync(uid);
     }
     // 画面を再描画（syncReady に関わらず最新の localStorage を反映）
