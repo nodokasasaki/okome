@@ -358,6 +358,8 @@ let _signingInUid = null;
 
 async function onUserSignedIn(user) {
   if (!_db) return;
+  // 匿名ユーザーはクラウド同期の対象外（ローカル専用）
+  if (user.isAnonymous) return;
   const uid = user.uid;
 
   // 同一 UID での二重実行を防ぐ（匿名→Google 昇格後の二重呼び出し対策）
