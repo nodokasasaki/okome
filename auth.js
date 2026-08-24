@@ -16,10 +16,24 @@ let _currentUser = null;  // 現在のユーザー（null = 未初期化 or 未�
 let _authReady = false;   // onAuthStateChanged の初回コールバック済みか
 let _authReadyCallbacks = [];
 
-// Redirect は browser sessionStorage に依存し、近年のブラウザ環境では失敗しやすいため
-// Googleログインは Popup を優先し、明示的にブロックされた場合のみ Redirect にフォールバックする。
+// Safari 通常ブラウザ判定
+// Chrome/Edge は UA に "Chrome" を含むため Safari 専用かどうかを判別できる
+function _isSafari() {
+  const ua = navigator.userAgent;
+  return /Safari/.test(ua) && !/Chrome/.test(ua) && !/Chromium/.test(ua);
+}
+
+// Safari 通常ブラウザでは Popup が ITP によりブロックされるため、
+// エラー発生時の Redirect フォールバックに加え、Safari では最初から Redirect を使う。
 function _shouldFallbackToRedirect(err) {
-  return err?.code === 'auth/popup-blocked' || err?.code === 'auth/cancelled-popup-request';
+  return [
+    'auth/popup-blocked',
+    'auth/cancelled-popup-request',
+    'auth/operation-not-supported-in-this-environment',
+    'auth/web-storage-unsupported',
+    'auth/internal-error',
+    'auth/unauthorized-domain',
+  ].includes(err?.code);
 }
 
 // ----------------------------------------------------------------
@@ -74,7 +88,15 @@ function initAuth() {
         console.log('[Auth] Redirect ログイン成功:', redirectResult.user.uid);
       }
     }).catch(err => {
-      if (err.code && err.code !== 'auth/no-auth-event') {
+      // Safari ITP により sessionStorage が消えた場合など
+      // 無視してよいエラーコードは警告を出さない
+      const silentCodes = [
+        'auth/no-auth-event',
+        'auth/null-user',
+        'auth/web-storage-unsupported',
+        'auth/operation-not-supported-in-this-environment',
+      ];
+      if (err.code && !silentCodes.includes(err.code)) {
         console.warn('[Auth] getRedirectResult エラー:', err.code, err.message);
       }
     }).finally(() => {
@@ -141,15 +163,20 @@ async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
+    // Safari 通常ブラウザは ITP でポップアップがブロックされるため最初から Redirect を使う
+    const useSafariRedirect = _isSafari();
+
     if (_currentUser?.isAnonymous) {
+      if (useSafariRedirect) {
+        await _currentUser.linkWithRedirect(provider);
+        return { ok: true };
+      }
       try {
         await _currentUser.linkWithPopup(provider);
         showToast('Googleアカウントと連携しました！データを引き継ぎました');
       } catch (linkErr) {
         // 既存の実アカウントと同じGoogleアカウントを選択した場合は
         // linkWithPopup が失敗するので、通常のサインインにフォールバック。
-        // credential-already-in-use: e.credential が取れる場合はそれを使う
-        // account-exists-with-different-credential: e.credential がない場合も想定
         if (linkErr.code === 'auth/credential-already-in-use' ||
             linkErr.code === 'auth/account-exists-with-different-credential') {
           const cred = linkErr.credential
@@ -160,10 +187,14 @@ async function signInWithGoogle() {
           await _currentUser.linkWithRedirect(provider);
           return { ok: true };
         } else {
-          throw linkErr; // それ以外は上位 catch へ
+          throw linkErr;
         }
       }
     } else {
+      if (useSafariRedirect) {
+        await _auth.signInWithRedirect(provider);
+        return { ok: true };
+      }
       try {
         await _auth.signInWithPopup(provider);
       } catch (popupErr) {
