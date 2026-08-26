@@ -56,67 +56,77 @@ async function initAuth() {
     _auth.languageCode = 'ja';
 
     // ----------------------------------------------------------------
-    // 【重要】Auth の IndexedDB 操作を Firestore の IndexedDB 操作より先に完結させる
+    // 初期化の正しい順序：
     //
-    // initFirestore() は enablePersistence() で IndexedDB をロックする処理を開始する。
-    // これを先に呼ぶと setPersistence / getRedirectResult が使う Auth の IndexedDB と
-    // 競合し、通常ブラウザ（既存 IndexedDB あり）でのみ getRedirectResult が空を返す。
-    // プライベートブラウザは IndexedDB が毎回空なので競合が起きず成功していた。
+    //  1. setPersistence  … Auth の IndexedDB ストレージ設定
+    //  2. onAuthStateChanged 登録  … Firebase 12 compat では getRedirectResult が
+    //                                内部的に onAuthStateChanged を待つ実装になっており、
+    //                                登録前に getRedirectResult を await すると
+    //                                永遠に解決しない（プライベートを含む全ブラウザで詰まる）
+    //  3. getRedirectResult  … onAuthStateChanged 登録後に並行して呼ぶ
+    //  4. initFirestore … Firestore の enablePersistence は Auth の IndexedDB 操作と
+    //                     競合するため、setPersistence の完了後に呼ぶ
     //
-    // 修正：Auth 側の処理（setPersistence → getRedirectResult → onAuthStateChanged）を
-    // すべて完了させてから initFirestore() を呼ぶ。
+    // onAuthStateChanged の「初回 null → 実ユーザー」2回発火問題は、
+    // getRedirectResult の結果が出るまで onAuthReady の発火を保留することで回避する。
     // ----------------------------------------------------------------
+
     await _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => {
       console.warn('[Auth] setPersistence 失敗（無視して続行）:', e.code);
     });
 
-    let redirectUser = null;
-    try {
-      const redirectResult = await _auth.getRedirectResult();
-      if (redirectResult.user) {
-        redirectUser = redirectResult.user;
-        _currentUser = redirectResult.user;
-        const wasAnon = redirectResult.additionalUserInfo?.isNewUser === false;
-        if (wasAnon) showToast('Googleアカウントと連携しました！データを引き継ぎました');
+    // setPersistence 完了後に Firestore を初期化（IndexedDB 競合を回避）
+    initFirestore();
+    extendDBWithCloud();
+
+    // getRedirectResult の結果を保持するための Promise
+    // onAuthStateChanged コールバック内で参照し、発火を getRedirectResult 完了まで保留する
+    let _redirectResultHandled = false;
+    const redirectPromise = _auth.getRedirectResult().then(result => {
+      if (result?.user) {
+        _currentUser = result.user;
         closeAuthModal();
-        console.log('[Auth] Redirect ログイン成功:', redirectResult.user.uid);
+        console.log('[Auth] Redirect ログイン成功:', result.user.uid);
       }
-    } catch (err) {
-      // Safari ITP により sessionStorage が消えた場合など無視してよいエラー
+      _redirectResultHandled = true;
+    }).catch(err => {
+      _redirectResultHandled = true;
       const silentCodes = [
         'auth/no-auth-event',
         'auth/null-user',
         'auth/web-storage-unsupported',
         'auth/operation-not-supported-in-this-environment',
       ];
-      if (err.code && !silentCodes.includes(err.code)) {
+      if (err?.code && !silentCodes.includes(err.code)) {
         console.warn('[Auth] getRedirectResult エラー:', err.code, err.message);
       }
-    }
+    });
 
-    // Auth の IndexedDB 操作が完全に終わってから Firestore を初期化する。
-    // enablePersistence() の IndexedDB ロックが Auth 側と競合しなくなる。
-    initFirestore();
-    extendDBWithCloud();
+    // onAuthStateChanged を登録する（getRedirectResult より先に登録が必要）
+    _auth.onAuthStateChanged(async user => {
+      const prevUid    = _currentUser?.uid    || null;
+      const prevIsAnon = _currentUser?.isAnonymous ?? true;
 
-    // getRedirectResult 完了後に onAuthStateChanged を登録する。
-    // これにより Redirect 復帰時の「null→実ユーザー」2回発火の競合を完全に回避する。
-    _auth.onAuthStateChanged(user => {
-      const prevUid      = _currentUser?.uid      || null;
-      const prevIsAnon   = _currentUser?.isAnonymous ?? true;
-
-      // Redirect 成功時は _currentUser が既に実アカウントに設定済みなので
-      // onAuthStateChanged の user（null の可能性あり）で上書きしない
+      // Redirect 成功時は _currentUser が既に設定済みなので上書きしない
       if (!_currentUser) _currentUser = user;
 
       if (!_authReady) {
-        // 初回：onAuthReady を発火
+        // getRedirectResult が完了するまで onAuthReady の発火を待つ
+        await redirectPromise;
+
+        // redirectPromise 完了後に _currentUser が実ユーザーに更新されている場合がある
+        // ので、ここで最新の currentUser を参照する
+        const resolvedUser = _auth.currentUser;
+        if (resolvedUser && !resolvedUser.isAnonymous) {
+          _currentUser = resolvedUser;
+        } else if (!_currentUser) {
+          _currentUser = user;
+        }
+
         _authReady = true;
         _authReadyCallbacks.forEach(cb => cb(_currentUser));
         _authReadyCallbacks = [];
         updateAuthUI(_currentUser);
-        // 初回コールバック時にすでに実ユーザーがいる場合（通常ブラウザのリロード等）も
-        // クラウド同期を起動する（プライベートモードとの動作差を解消）
         if (_currentUser && !_currentUser.isAnonymous) {
           onUserSignedIn?.(_currentUser);
         }
@@ -125,12 +135,10 @@ async function initAuth() {
         _currentUser = user;
         if (user && (
           user.uid !== prevUid ||
-          // 同一 uid でも匿名→実アカウントへ昇格した場合（linkWithPopup）は同期を起動する
           (prevIsAnon && !user.isAnonymous)
         )) {
           onUserSignedIn?.(user);
         } else if (!user && prevUid) {
-          // ログアウト：リアルタイム同期を停止
           stopRealtimeSync?.();
         }
         updateAuthUI(_currentUser);
