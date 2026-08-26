@@ -33,6 +33,8 @@ function _shouldFallbackToRedirect(err) {
     'auth/web-storage-unsupported',
     'auth/internal-error',
     'auth/unauthorized-domain',
+    // COOP ヘッダーによりポップアップ間通信がブロックされた場合
+    'auth/popup-closed-by-browser',
   ].includes(err?.code);
 }
 
