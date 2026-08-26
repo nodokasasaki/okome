@@ -23,8 +23,58 @@ function _isSafari() {
   return /Safari/.test(ua) && !/Chrome/.test(ua) && !/Chromium/.test(ua);
 }
 
-// Safari 通常ブラウザでは Popup が ITP によりブロックされるため、
-// エラー発生時の Redirect フォールバックに加え、Safari では最初から Redirect を使う。
+// ポップアップの代わりにリダイレクトを使うべき環境かを判定する。
+//
+// 【COOP 問題について】
+//   accounts.google.com は Cross-Origin-Opener-Policy: same-origin を返すため、
+//   親ページが window.closed をポーリングしようとすると COOP によりブロックされる。
+//   これは Google 側の仕様であり、こちらのサーバーヘッダーを変えても解決しない。
+//   プライベートブラウジングでは Cookie 制限も重なりポップアップ認証が完了しないため、
+//   Safari・iOS・プライベートブラウザでは最初からリダイレクト方式を使う。
+function _shouldUseRedirect() {
+  // Safari（iOS/macOS 通常ブラウザ）: ITP によるサードパーティ Cookie 制限
+  if (_isSafari()) return true;
+
+  // iOS の全ブラウザ: WebKit 強制のため同様に制限あり
+  if (/iPhone|iPad|iPod/.test(navigator.userAgent)) return true;
+
+  // プライベートブラウジング検出（Safari / Firefox）
+  // Safari プライベートは localStorage への書き込みで例外を投げる
+  try {
+    localStorage.setItem('__coop_test', '1');
+    localStorage.removeItem('__coop_test');
+  } catch (_) {
+    return true;
+  }
+
+  return false;
+}
+
+// プライベートブラウジング検出の非同期版（Chrome incognito 判定用）
+// Chrome incognito は localStorage が使えるが filesystem quota が極端に小さい。
+// signInWithGoogle 呼び出し前に非同期で確認し、結果をキャッシュする。
+let _redirectDecisionCache = null;
+async function _resolveUseRedirect() {
+  if (_redirectDecisionCache !== null) return _redirectDecisionCache;
+  if (_shouldUseRedirect()) {
+    _redirectDecisionCache = true;
+    return true;
+  }
+  // Chrome incognito の検出: StorageManager の quota が 120MB 未満
+  try {
+    if (navigator.storage && navigator.storage.estimate) {
+      const { quota } = await navigator.storage.estimate();
+      if (quota < 120 * 1024 * 1024) {
+        _redirectDecisionCache = true;
+        return true;
+      }
+    }
+  } catch (_) { /* 非対応ブラウザは無視 */ }
+  _redirectDecisionCache = false;
+  return false;
+}
+
+// エラーコードによるリダイレクトフォールバック判定
 function _shouldFallbackToRedirect(err) {
   return [
     'auth/popup-blocked',
@@ -33,7 +83,6 @@ function _shouldFallbackToRedirect(err) {
     'auth/web-storage-unsupported',
     'auth/internal-error',
     'auth/unauthorized-domain',
-    // COOP ヘッダーによりポップアップ間通信がブロックされた場合
     'auth/popup-closed-by-browser',
   ].includes(err?.code);
 }
@@ -171,11 +220,12 @@ async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // Safari 通常ブラウザは ITP でポップアップがブロックされるため最初から Redirect を使う
-    const useSafariRedirect = _isSafari();
+    // Safari / iOS / プライベートブラウザ / Chrome incognito は
+    // COOP・ITP の影響でポップアップ認証が機能しないため最初からリダイレクト方式を使う
+    const useRedirect = await _resolveUseRedirect();
 
     if (_currentUser?.isAnonymous) {
-      if (useSafariRedirect) {
+      if (useRedirect) {
         await _currentUser.linkWithRedirect(provider);
         return { ok: true };
       }
@@ -199,7 +249,7 @@ async function signInWithGoogle() {
         }
       }
     } else {
-      if (useSafariRedirect) {
+      if (useRedirect) {
         await _auth.signInWithRedirect(provider);
         return { ok: true };
       }
