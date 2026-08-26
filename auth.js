@@ -65,10 +65,17 @@ async function initAuth() {
     });
 
     // ----------------------------------------------------------------
-    // Safari では signInWithRedirect が ITP により機能しない（Firebase 12+）。
-    // Redirect を使わずポップアップのみで完結するため、getRedirectResult は
-    // 常に空を返す。呼ぶ必要はないが、過去のリダイレクト試行が残っている
-    // 場合への対応として一応呼び、エラーはすべて無視する。
+    // getRedirectResult を必ず await してから onAuthStateChanged を登録する。
+    //
+    // Safari では signInWithPopup を呼んでも Firebase SDK が内部で
+    // firebaseapp.com 経由のリダイレクトフローに切り替える。
+    // そのためページ遷移が発生し、戻り先で getRedirectResult() を呼んで
+    // 認証結果を受け取る必要がある。
+    //
+    // getRedirectResult が成功した場合: _currentUser を設定し、
+    //   onAuthStateChanged の初回コールバックでは上書きしない。
+    // getRedirectResult が失敗した場合: エラーコードをログに出し、
+    //   onAuthStateChanged の初回コールバックに委ねる。
     // ----------------------------------------------------------------
     try {
       const redirectResult = await _auth.getRedirectResult();
@@ -77,13 +84,22 @@ async function initAuth() {
         closeAuthModal();
         console.log('[Auth] Redirect ログイン成功:', redirectResult.user.uid);
       }
-    } catch (_) {
-      // Safari ITP 等で getRedirectResult が失敗しても問題なし（ポップアップ方式に移行済み）
+    } catch (err) {
+      // auth/no-auth-event はリダイレクトなしの通常起動時に必ず発生する無害なエラー。
+      // それ以外のエラーはログに残す（ITP 等による sessionStorage 消去を含む）。
+      if (err?.code !== 'auth/no-auth-event') {
+        console.warn('[Auth] getRedirectResult エラー:', err?.code, err?.message);
+      }
     }
 
-    // onAuthStateChanged で IndexedDB からトークンを復元する。
-    // ポップアップ方式では getRedirectResult は不要なため、
-    // onAuthStateChanged の初回コールバックをそのまま信頼する。
+    // getRedirectResult 完了後に onAuthStateChanged を登録する。
+    // これにより Redirect 復帰時の「null→実ユーザー」2回発火の競合を防ぐ。
+    //
+    // ただし Safari ITP 等で getRedirectResult が失敗した場合、
+    // onAuthStateChanged が null → 実ユーザーの順に2回発火することがある。
+    // 初回が null のとき即座に onAuthReady を発火すると匿名ログインが走るため、
+    // null の場合は 1 tick 待って実ユーザーが来ないか確認してから発火する。
+    let _firstCallTimer = null;
     _auth.onAuthStateChanged(user => {
       const prevUid      = _currentUser?.uid      || null;
       const prevIsAnon   = _currentUser?.isAnonymous ?? true;
@@ -92,13 +108,28 @@ async function initAuth() {
       if (!_currentUser) _currentUser = user;
 
       if (!_authReady) {
-        // 初回：onAuthReady を発火
-        _authReady = true;
-        _authReadyCallbacks.forEach(cb => cb(_currentUser));
-        _authReadyCallbacks = [];
-        updateAuthUI(_currentUser);
-        if (_currentUser && !_currentUser.isAnonymous) {
-          onUserSignedIn?.(_currentUser);
+        if (_currentUser) {
+          // 実ユーザーまたは匿名ユーザーが確定 → 即座に onAuthReady を発火
+          if (_firstCallTimer) { clearTimeout(_firstCallTimer); _firstCallTimer = null; }
+          _authReady = true;
+          _authReadyCallbacks.forEach(cb => cb(_currentUser));
+          _authReadyCallbacks = [];
+          updateAuthUI(_currentUser);
+          if (_currentUser && !_currentUser.isAnonymous) {
+            onUserSignedIn?.(_currentUser);
+          }
+        } else {
+          // null が来た → リダイレクト後に実ユーザーが続けて来る可能性があるため
+          // 200ms 待ってから onAuthReady を発火する
+          if (_firstCallTimer) return; // 既に待機中
+          _firstCallTimer = setTimeout(() => {
+            _firstCallTimer = null;
+            if (_authReady) return; // 待機中に実ユーザーが来て発火済み
+            _authReady = true;
+            _authReadyCallbacks.forEach(cb => cb(_currentUser));
+            _authReadyCallbacks = [];
+            updateAuthUI(_currentUser);
+          }, 200);
         }
       } else {
         // 2回目以降（再ログイン・ログアウト）
