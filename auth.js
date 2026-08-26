@@ -23,8 +23,9 @@ function _isSafari() {
   return /Safari/.test(ua) && !/Chrome/.test(ua) && !/Chromium/.test(ua);
 }
 
-// Safari 通常ブラウザでは Popup が ITP によりブロックされるため、
-// エラー発生時の Redirect フォールバックに加え、Safari では最初から Redirect を使う。
+// Popup フォールバックが必要なエラーかどうかを判定
+// Safari では signInWithRedirect が ITP により動作しないため、
+// ポップアップを最初に試み、本当にブロックされた場合のみリダイレクトにフォールバックする。
 function _shouldFallbackToRedirect(err) {
   return [
     'auth/popup-blocked',
@@ -39,7 +40,7 @@ function _shouldFallbackToRedirect(err) {
 // ----------------------------------------------------------------
 // 初期化
 // ----------------------------------------------------------------
-function initAuth() {
+async function initAuth() {
   if (!FIREBASE_CONFIGURED) {
     // Firebase 未設定時はローカルモードとして即座に ready 扱い
     _authReady = true;
@@ -59,84 +60,59 @@ function initAuth() {
     // 日本語UIを設定
     _auth.languageCode = 'ja';
 
-    // ----------------------------------------------------------------
-    // セッション永続化（スマホでアプリを閉じてもログイン状態を維持）
-    // デフォルトは LOCAL だが、スマホブラウザ・PWA 環境では明示指定が必要。
-    // setPersistence は非同期だが、完了前に onAuthStateChanged が
-    // 走っても問題ないため await せず then チェーンで続行する。
-    // ----------------------------------------------------------------
-    _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => {
+    await _auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL).catch(e => {
       console.warn('[Auth] setPersistence 失敗（無視して続行）:', e.code);
     });
 
     // ----------------------------------------------------------------
-    // スマホ Redirect ログイン対応
-    //
-    // 設計：
-    //   getRedirectResult() の完了を待ってから onAuthStateChanged を登録する。
-    //   これにより Redirect 復帰時の「null→実ユーザー」2回発火の競合を完全に回避する。
-    //   Redirect なし（通常起動）の場合は getRedirectResult が即座に
-    //   { user: null } で resolve するため遅延はほぼゼロ。
+    // Safari では signInWithRedirect が ITP により機能しない（Firebase 12+）。
+    // Redirect を使わずポップアップのみで完結するため、getRedirectResult は
+    // 常に空を返す。呼ぶ必要はないが、過去のリダイレクト試行が残っている
+    // 場合への対応として一応呼び、エラーはすべて無視する。
     // ----------------------------------------------------------------
-    _auth.getRedirectResult().then(redirectResult => {
-      // Redirect ログイン成功時：_currentUser を実アカウントに更新
-      if (redirectResult.user) {
+    try {
+      const redirectResult = await _auth.getRedirectResult();
+      if (redirectResult?.user) {
         _currentUser = redirectResult.user;
-        const wasAnon = redirectResult.additionalUserInfo?.isNewUser === false;
-        if (wasAnon) showToast('Googleアカウントと連携しました！データを引き継ぎました');
         closeAuthModal();
         console.log('[Auth] Redirect ログイン成功:', redirectResult.user.uid);
       }
-    }).catch(err => {
-      // Safari ITP により sessionStorage が消えた場合など
-      // 無視してよいエラーコードは警告を出さない
-      const silentCodes = [
-        'auth/no-auth-event',
-        'auth/null-user',
-        'auth/web-storage-unsupported',
-        'auth/operation-not-supported-in-this-environment',
-      ];
-      if (err.code && !silentCodes.includes(err.code)) {
-        console.warn('[Auth] getRedirectResult エラー:', err.code, err.message);
-      }
-    }).finally(() => {
-      // getRedirectResult の完了（成功・失敗問わず）後に onAuthStateChanged を登録する。
-      // これにより Redirect 復帰後は _currentUser が確定した状態でリスナーが起動する。
-      _auth.onAuthStateChanged(user => {
-        const prevUid      = _currentUser?.uid      || null;
-        const prevIsAnon   = _currentUser?.isAnonymous ?? true;
+    } catch (_) {
+      // Safari ITP 等で getRedirectResult が失敗しても問題なし（ポップアップ方式に移行済み）
+    }
 
-        // Redirect 成功時は _currentUser が既に実アカウントに設定済みなので
-        // onAuthStateChanged の user（null の可能性あり）で上書きしない
-        if (!_currentUser) _currentUser = user;
+    // onAuthStateChanged で IndexedDB からトークンを復元する。
+    // ポップアップ方式では getRedirectResult は不要なため、
+    // onAuthStateChanged の初回コールバックをそのまま信頼する。
+    _auth.onAuthStateChanged(user => {
+      const prevUid      = _currentUser?.uid      || null;
+      const prevIsAnon   = _currentUser?.isAnonymous ?? true;
 
-        if (!_authReady) {
-          // 初回：onAuthReady を発火
-          _authReady = true;
-          _authReadyCallbacks.forEach(cb => cb(_currentUser));
-          _authReadyCallbacks = [];
-          updateAuthUI(_currentUser);
-          // 初回コールバック時にすでに実ユーザーがいる場合（通常ブラウザでのリロード等）も
-          // クラウド同期を起動する（プライベートモードとの動作差を解消）
-          if (_currentUser && !_currentUser.isAnonymous) {
-            onUserSignedIn?.(_currentUser);
-          }
-        } else {
-          // 2回目以降（再ログイン・ログアウト）
-          _currentUser = user;
-          if (user && (
-            user.uid !== prevUid ||
-            // 同一 uid でも匿名→実アカウントへ昇格した場合（linkWithPopup）は同期を起動する
-            (prevIsAnon && !user.isAnonymous)
-          )) {
-            onUserSignedIn?.(user);
-          } else if (!user && prevUid) {
-            // ログアウト：リアルタイム同期を停止
-            stopRealtimeSync?.();
-          }
-          updateAuthUI(_currentUser);
+      // getRedirectResult で既に実ユーザーが設定済みの場合は上書きしない
+      if (!_currentUser) _currentUser = user;
+
+      if (!_authReady) {
+        // 初回：onAuthReady を発火
+        _authReady = true;
+        _authReadyCallbacks.forEach(cb => cb(_currentUser));
+        _authReadyCallbacks = [];
+        updateAuthUI(_currentUser);
+        if (_currentUser && !_currentUser.isAnonymous) {
+          onUserSignedIn?.(_currentUser);
         }
-      });
+      } else {
+        // 2回目以降（再ログイン・ログアウト）
+        _currentUser = user;
+        if (user && (
+          user.uid !== prevUid ||
+          (prevIsAnon && !user.isAnonymous)
+        )) {
+          onUserSignedIn?.(user);
+        } else if (!user && prevUid) {
+          stopRealtimeSync?.();
+        }
+        updateAuthUI(_currentUser);
+      }
     });
   } catch (e) {
     console.error('[Auth] 初期化失敗:', e);
@@ -163,20 +139,14 @@ async function signInWithGoogle() {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
 
-    // Safari 通常ブラウザは ITP でポップアップがブロックされるため最初から Redirect を使う
-    const useSafariRedirect = _isSafari();
-
+    // ポップアップを最初に試みる（Safari を含むすべてのブラウザ）。
+    // signInWithRedirect は Safari ITP により動作しないため使用しない。
+    // ポップアップが本当にブロックされた場合のみリダイレクトにフォールバックする。
     if (_currentUser?.isAnonymous) {
-      if (useSafariRedirect) {
-        await _currentUser.linkWithRedirect(provider);
-        return { ok: true };
-      }
       try {
         await _currentUser.linkWithPopup(provider);
         showToast('Googleアカウントと連携しました！データを引き継ぎました');
       } catch (linkErr) {
-        // 既存の実アカウントと同じGoogleアカウントを選択した場合は
-        // linkWithPopup が失敗するので、通常のサインインにフォールバック。
         if (linkErr.code === 'auth/credential-already-in-use' ||
             linkErr.code === 'auth/account-exists-with-different-credential') {
           const cred = linkErr.credential
@@ -191,10 +161,6 @@ async function signInWithGoogle() {
         }
       }
     } else {
-      if (useSafariRedirect) {
-        await _auth.signInWithRedirect(provider);
-        return { ok: true };
-      }
       try {
         await _auth.signInWithPopup(provider);
       } catch (popupErr) {
@@ -208,7 +174,6 @@ async function signInWithGoogle() {
     closeAuthModal();
     return { ok: true };
   } catch (e) {
-    // Redirect 経由・その他で credential-already-in-use が来た場合のフォールバック
     if ((e.code === 'auth/credential-already-in-use' ||
          e.code === 'auth/account-exists-with-different-credential') && e.credential) {
       try {
