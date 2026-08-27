@@ -22,22 +22,44 @@
 
 let _db = null;  // Firestore インスタンス
 
-function initFirestore() {
+async function initFirestore() {
   if (!FIREBASE_CONFIGURED) return;
   try {
-    _db = firebase.firestore();
-    // オフラインキャッシュを有効にする（PWA 対応）
-    _db.enablePersistence({ synchronizeTabs: true }).catch(e => {
-      // Safari は synchronizeTabs 非対応 → タブなし設定でリトライ
-      if (e.code === 'failed-precondition') {
-        console.warn('[DB] enablePersistence: 複数タブ競合、synchronizeTabs なしで再試行');
-        _db.enablePersistence().catch(() => {});
-      } else if (e.code === 'unimplemented') {
-        console.warn('[DB] enablePersistence: このブラウザは非対応（Safari プライベート等）');
+    // enablePersistence() / enableMultiTabIndexedDbPersistence() は非推奨のため、
+    // Modular API の initializeFirestore + persistentMultipleTabManager を使用する。
+    const {
+      initializeFirestore,
+      persistentMultipleTabManager,
+      persistentLocalCache,
+      memoryLocalCache,
+    } = await import('https://www.gstatic.com/firebasejs/12.2.1/firebase-firestore.js');
+
+    // Compat SDK の FirebaseApp ラッパーから Modular App インスタンスを取得
+    const modularApp = firebase.app()._delegate;
+
+    // persistentMultipleTabManager は IndexedDB 非対応環境では例外を出さず、
+    // 内部でフォールバックするため、シンプルに1種類だけ指定する。
+    // Safari プライベートモード等で IndexedDB が使えない場合は memoryLocalCache にフォールバック。
+    let cache;
+    try {
+      cache = persistentMultipleTabManager();
+    } catch {
+      try {
+        cache = persistentLocalCache();
+      } catch {
+        console.warn('[DB] オフラインキャッシュ非対応（Safari プライベート等）、メモリキャッシュを使用');
+        cache = memoryLocalCache();
       }
-    });
+    }
+
+    initializeFirestore(modularApp, { cache });
+
+    // Compat SDK の _db は Modular で初期化済みのインスタンスに自動的に紐づく
+    _db = firebase.firestore();
   } catch (e) {
     console.error('[DB] Firestore 初期化失敗:', e);
+    // フォールバック: キャッシュなしで通常初期化
+    try { _db = firebase.firestore(); } catch {}
   }
 }
 
