@@ -115,8 +115,8 @@ async function initAuth() {
     //                                登録前に getRedirectResult を await すると
     //                                永遠に解決しない（プライベートを含む全ブラウザで詰まる）
     //  3. getRedirectResult  … onAuthStateChanged 登録後に並行して呼ぶ
-    //  4. initFirestore … Firestore の enablePersistence は Auth の IndexedDB 操作と
-    //                     競合するため、setPersistence の完了後に呼ぶ
+    //  4. initFirestore … Firestore の初期化（persistentMultipleTabManager）は
+    //                     Auth の IndexedDB 操作と競合するため、setPersistence 完了後に呼ぶ
     //
     // onAuthStateChanged の「初回 null → 実ユーザー」2回発火問題は、
     // getRedirectResult の結果が出るまで onAuthReady の発火を保留することで回避する。
@@ -127,7 +127,7 @@ async function initAuth() {
     });
 
     // setPersistence 完了後に Firestore を初期化（IndexedDB 競合を回避）
-    initFirestore();
+    await initFirestore();
     extendDBWithCloud();
 
     // getRedirectResult の結果を保持するための Promise
