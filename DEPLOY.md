@@ -110,7 +110,8 @@ Firebase コンソール → Authentication → 「設定」タブ → 「承認
 | デプロイ先 | 追加するドメイン |
 |---|---|
 | GitHub Pages | `nodokasasaki.github.io` |
-| Cloudflare Pages | `okome.pages.dev` |
+| Cloudflare Pages 本番 | `ouchirhythm.pages.dev` |
+| Cloudflare Pages 開発プレビュー | `okomedev.pages.dev` |
 | カスタムドメイン | 独自ドメイン |
 | ローカル開発 | `localhost`（デフォルトで追加済み） |
 
