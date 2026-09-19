@@ -276,11 +276,15 @@ git checkout main && git merge dev && git push origin main && git checkout dev
 | 変数名 | 値 |
 |--------|-----|
 | `FIREBASE_API_KEY` | Firebase の apiKey |
-| `FIREBASE_AUTH_DOMAIN` | Firebase の authDomain |
 | `FIREBASE_PROJECT_ID` | Firebase の projectId |
 | `FIREBASE_STORAGE_BUCKET` | Firebase の storageBucket |
 | `FIREBASE_MESSAGING_SENDER_ID` | Firebase の messagingSenderId |
 | `FIREBASE_APP_ID` | Firebase の appId |
+
+> ⚠️ **`FIREBASE_AUTH_DOMAIN` は設定不要です（`build.sh` が `<projectId>.firebaseapp.com` を自動設定）。**
+> Cloudflare Pages のドメイン（`ouchirhythm.pages.dev` など）を authDomain に設定すると、
+> `signInWithRedirect` の `/__/auth/handler` がそのドメインに向き、
+> Firebase Hosting なしでは認証ループが発生します。
 
 5. 「Save and Deploy」
 

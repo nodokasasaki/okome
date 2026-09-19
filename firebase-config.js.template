@@ -22,6 +22,9 @@
      FIREBASE_APP_ID
    ================================================================ */
 
+// authDomain は必ず <projectId>.firebaseapp.com を使うこと。
+// Cloudflare Pages 等のカスタムドメインを設定すると signInWithRedirect の
+// /__/auth/handler がそのドメインに向き、Firebase Hosting なしでは認証ループが発生する。
 const FIREBASE_CONFIG = {
   apiKey:            "YOUR_API_KEY",
   authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
