@@ -50,28 +50,15 @@ function _shouldUseRedirect() {
   return false;
 }
 
-// プライベートブラウジング検出の非同期版（Chrome incognito 判定用）
-// Chrome incognito は localStorage が使えるが filesystem quota が極端に小さい。
-// signInWithGoogle 呼び出し前に非同期で確認し、結果をキャッシュする。
+// プライベートブラウジング検出の非同期版
+// Chrome incognito の quota チェックは通常ブラウザでも誤検出が多く、
+// authDomain が firebaseapp.com の場合は /__/auth/handler が正しく機能するため
+// リダイレクトを誤って強制しないよう quota チェックは行わない。
 let _redirectDecisionCache = null;
 async function _resolveUseRedirect() {
   if (_redirectDecisionCache !== null) return _redirectDecisionCache;
-  if (_shouldUseRedirect()) {
-    _redirectDecisionCache = true;
-    return true;
-  }
-  // Chrome incognito の検出: StorageManager の quota が 120MB 未満
-  try {
-    if (navigator.storage && navigator.storage.estimate) {
-      const { quota } = await navigator.storage.estimate();
-      if (quota < 120 * 1024 * 1024) {
-        _redirectDecisionCache = true;
-        return true;
-      }
-    }
-  } catch (_) { /* 非対応ブラウザは無視 */ }
-  _redirectDecisionCache = false;
-  return false;
+  _redirectDecisionCache = _shouldUseRedirect();
+  return _redirectDecisionCache;
 }
 
 // エラーコードによるリダイレクトフォールバック判定
