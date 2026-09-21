@@ -27,15 +27,15 @@ console.warn('[おうちリズム] Firebase未設定。ローカルモードで�
 TEMPLATE
 else
   # 環境変数から firebase-config.js を生成
-  # authDomain は必ず <projectId>.firebaseapp.com を使う。
-  # Cloudflare Pages 等のカスタムドメインを authDomain にすると
-  # signInWithRedirect の /__/auth/handler がそのドメインに向いてしまい
-  # Firebase Hosting なしでは認証ループが発生する。
   cat > firebase-config.js << TEMPLATE
 /* 自動生成 — コミットしないこと */
+const _authHost = (typeof window !== 'undefined' && window.location && window.location.hostname.endsWith('.web.app'))
+  ? window.location.hostname
+  : "${FIREBASE_PROJECT_ID}.firebaseapp.com";
+
 const FIREBASE_CONFIG = {
   apiKey:            "${FIREBASE_API_KEY}",
-  authDomain:        "${FIREBASE_PROJECT_ID}.firebaseapp.com",
+  authDomain:        _authHost,
   projectId:         "${FIREBASE_PROJECT_ID}",
   storageBucket:     "${FIREBASE_STORAGE_BUCKET}",
   messagingSenderId: "${FIREBASE_MESSAGING_SENDER_ID}",
