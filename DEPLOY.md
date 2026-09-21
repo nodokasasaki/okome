@@ -115,6 +115,36 @@ Firebase コンソール → Authentication → 「設定」タブ → 「承認
 | カスタムドメイン | 独自ドメイン |
 | ローカル開発 | `localhost`（デフォルトで追加済み） |
 
+> ⚠️ **プレビューURLについての注意：**
+> Cloudflare Pages は `dev` ブランチの push ごとにコミット別のプレビューURL（例: `abc123.okome.pages.dev`）を発行しますが、
+> Google は承認済みドメインにワイルドカードを許可しないため、**コミット別URLでのGoogleログインは常に失敗します。**
+> テストは必ずブランチURLの固定版（`okomedev.pages.dev` または `ouchirhythm.pages.dev`）で行ってください。
+
+### Step 7 — Google Cloud Console で OAuth 設定を確認
+
+> ⚠️ **Firebase Authentication の「承認済みドメイン」とは別に、Google Cloud Console 側にも設定が必要です。**
+
+1. https://console.cloud.google.com → Firebase プロジェクトを選択
+2. 「APIとサービス」→「認証情報」→ OAuth 2.0 クライアントID をクリック
+3. **「承認済みの JavaScript 生成元」** に以下を追加：
+   ```
+   https://ouchirhythm.pages.dev
+   https://okomedev.pages.dev
+   https://nodokasasaki.github.io
+   ```
+4. **「承認済みのリダイレクト URI」** に以下を追加：
+   ```
+   https://<FIREBASE_PROJECT_ID>.firebaseapp.com/__/auth/handler
+   ```
+   ※ `authDomain` は `pages.dev` ではなく `firebaseapp.com` を使っているため、リダイレクトURIは Supabase 的な自サイトURLではなく Firebase のハンドラーURLです。
+
+### Step 8 — OAuth 同意画面のテストユーザー設定（アプリが「テスト」状態の場合）
+
+Google Cloud Console → 「APIとサービス」→「OAuth 同意画面」を確認：
+
+- **公開ステータスが「テスト」の場合：** 「テストユーザー」欄に自分の Google アカウントのメールアドレスを追加しないと `access_denied` になります
+- **本番公開したい場合：** 「アプリを公開」ボタンを押して本番ステータスに変更（審査なしで可能なアプリが多い）
+
 ### 確認
 
 設定完了後、ローカルサーバー（`python3 -m http.server 8080`）で起動し、
