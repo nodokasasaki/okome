@@ -22,12 +22,16 @@
      FIREBASE_APP_ID
    ================================================================ */
 
-// authDomain は必ず <projectId>.firebaseapp.com を使うこと。
-// Cloudflare Pages 等のカスタムドメインを設定すると signInWithRedirect の
-// /__/auth/handler がそのドメインに向き、Firebase Hosting なしでは認証ループが発生する。
+// authDomain は Firebase Hosting 配信時 (web.app / firebaseapp.com) は
+// 現在のホスト名 (window.location.hostname) に動的適合させて Same-Origin 構成にし、
+// iOS/Safari の ITP・サードパーティストレージブロックによる認証失敗を防ぎます。
+const _authHost = (typeof window !== 'undefined' && window.location && window.location.hostname.endsWith('.web.app'))
+  ? window.location.hostname
+  : "YOUR_PROJECT_ID.firebaseapp.com";
+
 const FIREBASE_CONFIG = {
   apiKey:            "YOUR_API_KEY",
-  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  authDomain:        _authHost,
   projectId:         "YOUR_PROJECT_ID",
   storageBucket:     "YOUR_PROJECT_ID.firebasestorage.app",
   messagingSenderId: "YOUR_MESSAGING_SENDER_ID",
