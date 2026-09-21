@@ -3,8 +3,9 @@
 
 | 環境 | URL | 更新タイミング |
 |------|-----|---------------|
+| **本番環境**（Firebase Hosting） | https://kakusan-25200.web.app/ | `git push origin main`（GitHub Actions で自動更新） |
 | **開発環境**（Cloudflare プレビュー） | https://okomedev.pages.dev/ | `git push origin dev` のたびに自動更新 |
-| **本番環境**（Cloudflare Pages） | https://ouchirhythm.pages.dev/ | `git push origin main` のたびに自動更新 |
+| **本番環境（旧）**（Cloudflare Pages） | https://ouchirhythm.pages.dev/ | `git push origin main` のたびに自動更新 |
 | **本番環境**（GitHub Pages） | https://nodokasasaki.github.io/okome/ | `git push origin main` のたびに自動更新 |
 | **ローカル開発** | http://localhost:8080 | `python3 -m http.server 8080` で手動起動 |
 
@@ -109,6 +110,7 @@ Firebase コンソール → Authentication → 「設定」タブ → 「承認
 
 | デプロイ先 | 追加するドメイン |
 |---|---|
+| Firebase Hosting | `kakusan-25200.web.app`, `kakusan-25200.firebaseapp.com`（デフォルトで登録済み） |
 | GitHub Pages | `nodokasasaki.github.io` |
 | Cloudflare Pages 本番 | `ouchirhythm.pages.dev` |
 | Cloudflare Pages 開発プレビュー | `okomedev.pages.dev` |

@@ -25,21 +25,25 @@ function _isSafari() {
 
 // ポップアップの代わりにリダイレクトを使うべき環境かを判定する。
 //
-// 【COOP 問題について】
-//   accounts.google.com は Cross-Origin-Opener-Policy: same-origin を返すため、
-//   親ページが window.closed をポーリングしようとすると COOP によりブロックされる。
-//   これは Google 側の仕様であり、こちらのサーバーヘッダーを変えても解決しない。
-//   プライベートブラウジングでは Cookie 制限も重なりポップアップ認証が完了しないため、
-//   Safari・iOS・プライベートブラウザでは最初からリダイレクト方式を使う。
+// Firebase Hosting（*.web.app / *.firebaseapp.com）上でホストされている場合は、
+// アプリと認証ハンドラが同一オリジンになるためポップアップ認証が安定して機能します。
+// 外部オリジン（pages.dev や localhost 等）かつ Safari / iOS の場合のみリダイレクトを使用します。
 function _shouldUseRedirect() {
-  // Safari（iOS/macOS 通常ブラウザ）: ITP によるサードパーティ Cookie 制限
+  const isFirebaseHosting = typeof window !== 'undefined' && window.location && (
+    window.location.hostname.endsWith('.web.app') ||
+    window.location.hostname.endsWith('.firebaseapp.com')
+  );
+
+  // Firebase Hosting 環境ではポップアップが最も信頼性が高いためポップアップを優先
+  if (isFirebaseHosting) return false;
+
+  // Safari（iOS/macOS 通常ブラウザ）
   if (_isSafari()) return true;
 
-  // iOS の全ブラウザ: WebKit 強制のため同様に制限あり
+  // iOS の全ブラウザ
   if (/iPhone|iPad|iPod/.test(navigator.userAgent)) return true;
 
   // プライベートブラウジング検出（Safari / Firefox）
-  // Safari プライベートは localStorage への書き込みで例外を投げる
   try {
     localStorage.setItem('__coop_test', '1');
     localStorage.removeItem('__coop_test');
