@@ -2738,17 +2738,17 @@ function bindUnlockEvents() {
 }
 
 // ----------------------------------------------------------------
-// 18. PWA
+// 18. Service Worker 解除（PWA廃止に伴い既存登録を完全クリーンアップ）
 // ----------------------------------------------------------------
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
-    if (location.hostname === 'localhost' || location.hostname === '127.0.0.1') {
-      // ローカル開発中はキャッシュを使わないよう SW を全解除
-      navigator.serviceWorker.getRegistrations().then(regs => {
-        regs.forEach(reg => reg.unregister());
+    navigator.serviceWorker.getRegistrations().then(regs => {
+      regs.forEach(reg => reg.unregister());
+    });
+    if ('caches' in window) {
+      caches.keys().then(names => {
+        names.forEach(name => caches.delete(name));
       });
-    } else {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
     }
   });
 }
