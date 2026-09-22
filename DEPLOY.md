@@ -3,7 +3,7 @@
 
 | 環境 | URL | 更新タイミング |
 |------|-----|---------------|
-| **本番環境**（Firebase Hosting） | https://kakusan-25200.web.app/ | `git push origin main`（GitHub Actions で自動更新） |
+| **本番環境**（Firebase Hosting・統一URL） | https://kakusan-25200.web.app/ | `git push origin main`（GitHub Actions で自動更新） |
 | **開発環境**（Cloudflare プレビュー） | https://okomedev.pages.dev/ | `git push origin dev` のたびに自動更新 |
 | **本番環境（旧）**（Cloudflare Pages） | https://ouchirhythm.pages.dev/ | `git push origin main` のたびに自動更新 |
 | **本番環境**（GitHub Pages） | https://nodokasasaki.github.io/okome/ | `git push origin main` のたびに自動更新 |

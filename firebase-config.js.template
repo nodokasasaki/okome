@@ -22,16 +22,11 @@
      FIREBASE_APP_ID
    ================================================================ */
 
-// authDomain は Firebase Hosting 配信時 (web.app / firebaseapp.com) は
-// 現在のホスト名 (window.location.hostname) に動的適合させて Same-Origin 構成にし、
-// iOS/Safari の ITP・サードパーティストレージブロックによる認証失敗を防ぎます。
-const _authHost = (typeof window !== 'undefined' && window.location && window.location.hostname.endsWith('.web.app'))
-  ? window.location.hostname
-  : "YOUR_PROJECT_ID.firebaseapp.com";
-
+// authDomain は本番ホスティング先（web.app）と完全一致させて同一オリジン構成にし、
+// Safari / iOS WebKit の ITP・サードパーティストレージ分離による認証失敗を防ぎます。
 const FIREBASE_CONFIG = {
   apiKey:            "YOUR_API_KEY",
-  authDomain:        _authHost,
+  authDomain:        "YOUR_PROJECT_ID.web.app",
   projectId:         "YOUR_PROJECT_ID",
   storageBucket:     "YOUR_PROJECT_ID.firebasestorage.app",
   messagingSenderId: "YOUR_MESSAGING_SENDER_ID",

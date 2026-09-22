@@ -27,15 +27,12 @@ console.warn('[おうちリズム] Firebase未設定。ローカルモードで�
 TEMPLATE
 else
   # 環境変数から firebase-config.js を生成
+  # authDomain を本番ドメイン（${FIREBASE_PROJECT_ID}.web.app）に統一して完全な同一オリジンを保証
   cat > firebase-config.js << TEMPLATE
 /* 自動生成 — コミットしないこと */
-const _authHost = (typeof window !== 'undefined' && window.location && window.location.hostname.endsWith('.web.app'))
-  ? window.location.hostname
-  : "${FIREBASE_PROJECT_ID}.firebaseapp.com";
-
 const FIREBASE_CONFIG = {
   apiKey:            "${FIREBASE_API_KEY}",
-  authDomain:        _authHost,
+  authDomain:        "${FIREBASE_PROJECT_ID}.web.app",
   projectId:         "${FIREBASE_PROJECT_ID}",
   storageBucket:     "${FIREBASE_STORAGE_BUCKET}",
   messagingSenderId: "${FIREBASE_MESSAGING_SENDER_ID}",
