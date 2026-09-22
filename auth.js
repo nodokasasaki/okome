@@ -16,31 +16,33 @@ let _currentUser = null;  // 現在のユーザー（null = 未初期化 or 未�
 let _authReady = false;   // onAuthStateChanged の初回コールバック済みか
 let _authReadyCallbacks = [];
 
+// アプリ内ブラウザ（LINE, Instagram, Facebook, Twitter/X, etc.）の判定
+function _isInAppBrowser() {
+  const ua = navigator.userAgent || navigator.vendor || window.opera || '';
+  return /Line|FBAN|FBAV|Instagram|Twitter|MicroMessenger|Snapchat|musical_ly|BytedanceWebview/i.test(ua);
+}
+
 // Safari 通常ブラウザ判定
-// Chrome/Edge は UA に "Chrome" を含むため Safari 専用かどうかを判別できる
 function _isSafari() {
   const ua = navigator.userAgent;
   return /Safari/.test(ua) && !/Chrome/.test(ua) && !/Chromium/.test(ua);
 }
 
-// ポップアップの代わりにリダイレクトを使うべき環境かを判定する。
-//
-// Firebase Hosting（*.web.app / *.firebaseapp.com）上でホストされている場合は、
-// アプリと認証ハンドラが同一オリジンになるためポップアップ認証が安定して機能します。
-// 外部オリジン（pages.dev や localhost 等）かつ Safari / iOS の場合のみリダイレクトを使用します。
+// ポップアップの代わりにリダイレクトを使うべき環境かを判定する
 function _shouldUseRedirect() {
+  // アプリ内ブラウザ（LINE等）はポップアップもリダイレクトもブロックされるため、後で案内を出す
+  if (_isInAppBrowser()) return false;
+
   const isFirebaseHosting = typeof window !== 'undefined' && window.location && (
     window.location.hostname.endsWith('.web.app') ||
     window.location.hostname.endsWith('.firebaseapp.com')
   );
 
-  // Firebase Hosting 環境ではポップアップが最も信頼性が高いためポップアップを優先
+  // Firebase Hosting 環境ではオリジン一致するためポップアップが最優先で安定
   if (isFirebaseHosting) return false;
 
-  // Safari（iOS/macOS 通常ブラウザ）
+  // 外部オリジン（pages.dev等）での Safari / iOS
   if (_isSafari()) return true;
-
-  // iOS の全ブラウザ
   if (/iPhone|iPad|iPod/.test(navigator.userAgent)) return true;
 
   // プライベートブラウジング検出（Safari / Firefox）
@@ -124,23 +126,42 @@ async function initAuth() {
     // getRedirectResult の結果を保持するための Promise
     // onAuthStateChanged コールバック内で参照し、発火を getRedirectResult 完了まで保留する
     let _redirectResultHandled = false;
-    const redirectPromise = _auth.getRedirectResult().then(result => {
+    const redirectPromise = _auth.getRedirectResult().then(async result => {
       if (result?.user) {
         _currentUser = result.user;
         closeAuthModal();
+        showToast('Googleログインしました');
         console.log('[Auth] Redirect ログイン成功:', result.user.uid);
       }
       _redirectResultHandled = true;
-    }).catch(err => {
+    }).catch(async err => {
       _redirectResultHandled = true;
+      console.warn('[Auth] getRedirectResult catch:', err?.code, err?.message);
+
+      // 既存アカウントと衝突した場合（匿名からの linkWithRedirect でよく発生）、
+      // 通常の signInWithCredential に切り替えて既存アカウントでサインインする
+      if ((err?.code === 'auth/credential-already-in-use' ||
+           err?.code === 'auth/account-exists-with-different-credential') && err?.credential) {
+        try {
+          const credUser = await _auth.signInWithCredential(err.credential);
+          if (credUser?.user) {
+            _currentUser = credUser.user;
+            closeAuthModal();
+            showToast('Googleアカウントでログインしました');
+            return;
+          }
+        } catch (signInErr) {
+          console.error('[Auth] signInWithCredential 失敗:', signInErr);
+          showToast(_authErrorMsg(signInErr));
+        }
+      }
+
       const silentCodes = [
         'auth/no-auth-event',
         'auth/null-user',
-        'auth/web-storage-unsupported',
-        'auth/operation-not-supported-in-this-environment',
       ];
       if (err?.code && !silentCodes.includes(err.code)) {
-        console.warn('[Auth] getRedirectResult エラー:', err.code, err.message);
+        showToast(_authErrorMsg(err));
       }
     });
 
@@ -207,6 +228,16 @@ function onAuthReady(cb) {
 // 1) Googleログイン
 async function signInWithGoogle() {
   if (!_auth) return { error: 'Firebase未設定' };
+
+  // LINE 等のアプリ内ブラウザ警告（Google OAuth disallowed_useragent 回避）
+  if (_isInAppBrowser()) {
+    const isIOS = /iPhone|iPad|iPod/.test(navigator.userAgent);
+    const browserName = isIOS ? 'Safari' : 'Chrome';
+    const msg = `LINE等のアプリ内ブラウザではGoogleログインが利用できません。右上のメニュー等から「${browserName}で開く」を選択してください。`;
+    alert(msg);
+    return { error: msg };
+  }
+
   try {
     const provider = new firebase.auth.GoogleAuthProvider();
     provider.setCustomParameters({ prompt: 'select_account' });
