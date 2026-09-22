@@ -407,10 +407,16 @@ async function onPeriodUpdated() {
 function checkShareURLOnLoad() {
   const params = new URLSearchParams(location.search);
 
-  // 新方式：?room=<roomId>
-  const roomId = params.get('room');
+  // 新方式：?room=<roomId> または リダイレクト復帰用に保存した roomId
+  let roomId = params.get('room');
   if (roomId) {
+    try { sessionStorage.setItem('pending_invite_room', roomId); } catch (_) {}
     history.replaceState(null, '', location.pathname);
+  } else {
+    try { roomId = sessionStorage.getItem('pending_invite_room'); } catch (_) {}
+  }
+
+  if (roomId) {
     onAuthReady(async user => {
       // 未ログイン または 匿名ユーザーの場合はアカウント登録を必須にする
       // （生理記録という要配慮個人情報を共有するため匿名不可）
@@ -442,6 +448,7 @@ function checkShareURLOnLoad() {
           const anonNoteR = document.querySelector('.auth-anon-note');
           if (anonNoteR) anonNoteR.style.display = '';
           const result = await acceptInvite(roomId);
+          try { sessionStorage.removeItem('pending_invite_room'); } catch (_) {}
           if (result.ok) {
             showToast('パートナーと接続しました！');
             renderPeriod?.();
@@ -452,6 +459,7 @@ function checkShareURLOnLoad() {
         return;
       }
       const result = await acceptInvite(roomId);
+      try { sessionStorage.removeItem('pending_invite_room'); } catch (_) {}
       if (result.ok) {
         showToast('パートナーと接続しました！');
         renderPeriod?.();
