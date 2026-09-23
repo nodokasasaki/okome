@@ -92,12 +92,27 @@ function getGenre(id) { return GENRES.find(g => g.id === id) || GENRES[GENRES.le
 // ----------------------------------------------------------------
 // 2. データ管理
 // ----------------------------------------------------------------
+
+// メモリキャッシュ（LocalStorage廃止・Firestoreのみに永続化）
+// 匿名ユーザー時はここだけで完結し、Firestoreには書き込まない
+const _cache = {
+  or2_tasks:             [],
+  or2_logs:              [],
+  or2_period_days:       [],
+  or2_settings:          null,  // null = 未初期化（DEFAULT_SETTINGS を使う）
+  or2_partner:           null,
+  or2_unlocked:          [],
+  or2_dismissed_suggest: [],
+  or2_title_shown:       [],
+  or2_tutorial_cleared:  false,
+};
+
 const DB = {
   // period_days: { date:'2024-01-01', flow:'normal'|'light'|'heavy'|'none', symptoms:[], memo:'' }
   K: { tasks: 'or2_tasks', logs: 'or2_logs', period_days: 'or2_period_days', settings: 'or2_settings', partner: 'or2_partner', unlocked: 'or2_unlocked', dismissed_suggest: 'or2_dismissed_suggest', title_shown: 'or2_title_shown', tutorial_cleared: 'or2_tutorial_cleared' },
-  get(k)       { try { return JSON.parse(localStorage.getItem(k)) || []; } catch { return []; } },
-  getObj(k, d) { try { return JSON.parse(localStorage.getItem(k)) || d;  } catch { return d; } },
-  set(k, v)    { localStorage.setItem(k, JSON.stringify(v)); },
+  get(k)       { const v = _cache[k]; return Array.isArray(v) ? v : (v ?? []); },
+  getObj(k, d) { const v = _cache[k]; return v !== null && v !== undefined ? v : d; },
+  set(k, v)    { _cache[k] = v; },
 };
 
 const DEFAULT_SETTINGS = { homeType:'1ldk', cleanLevel:'normal', cycleLength:28, periodLen:5 };
@@ -193,6 +208,10 @@ function completeTask(taskId, date) {
   const logs = DB.get(DB.K.logs);
   logs.push({ id: uid(), taskId, completedAt: date });
   DB.set(DB.K.logs, logs);
+  // 匿名ユーザーがファーストタスクを完了したタイミングでログイン促進
+  if (!isLoggedIn?.() && isFirstTaskCleared()) {
+    setTimeout(() => openLoginPrompt('first'), 400);
+  }
 }
 
 function undoComplete(taskId, date) {
@@ -1135,7 +1154,7 @@ function getNextTitle() {
   return TITLE_TABLE.find(t => t.score > score) || null;
 }
 
-// 未通知の新称号があれば返す（通知済みIDはlocalStorageに保存）
+// 未通知の新称号があれば返す（通知済みIDは _cache に保存）
 function checkNewTitle() {
   const score     = calcTotalScore();
   const shown     = DB.get(DB.K.title_shown); // 通知済みIDの配列
@@ -1637,10 +1656,10 @@ function renderSettings() {
   document.getElementById('setting-cycle').value        = s.cycleLength || 28;
   document.getElementById('setting-period-len').value   = s.periodLen   || 5;
 
-  // 匿名ユーザー向け：データ消失リスクを警告してアカウント登録を促す
+  // 未ログインユーザー向け：データが永続化されないことを警告してアカウント登録を促す
   const anonWarning = document.getElementById('anon-user-warning');
   if (anonWarning) {
-    anonWarning.style.display = (FIREBASE_CONFIGURED && isAnonymous?.()) ? '' : 'none';
+    anonWarning.style.display = (FIREBASE_CONFIGURED && !isLoggedIn?.()) ? '' : 'none';
   }
 }
 
@@ -1728,6 +1747,26 @@ function openTaskModal(taskId = null) {
 
 function closeTaskModal() { document.getElementById('modal-task').classList.add('hidden'); }
 
+// ----------------------------------------------------------------
+// ログイン促進モーダル
+// ----------------------------------------------------------------
+function openLoginPrompt(reason) {
+  // ログイン済みなら何もしない（二重チェック）
+  if (isLoggedIn?.()) return;
+  const el = document.getElementById('modal-login-prompt');
+  if (!el) return;
+  // reason に応じてタイトルを切り替える
+  const title = document.getElementById('login-prompt-title');
+  if (title) {
+    title.textContent = reason === 'second' ? '2つ目のタスクを追加しました！' : '最初のタスク、完了！';
+  }
+  el.classList.remove('hidden');
+}
+
+function closeLoginPrompt() {
+  document.getElementById('modal-login-prompt')?.classList.add('hidden');
+}
+
 function saveTask() {
   const name = document.getElementById('input-task-name').value.trim();
   if (!name) { showToast('タスク名を入力してください'); return; }
@@ -1751,6 +1790,7 @@ function saveTask() {
     memo:  document.getElementById('input-task-memo').value.trim(),
   };
   const tasks = DB.get(DB.K.tasks);
+  const isAdding = !editingTaskId;
   if (editingTaskId) {
     const i = tasks.findIndex(t => t.id === editingTaskId);
     if (i !== -1) Object.assign(tasks[i], payload);
@@ -1761,6 +1801,13 @@ function saveTask() {
   closeTaskModal();
   renderCalendar(); renderTaskList();
   showToast(editingTaskId ? '更新しました' : '追加しました');
+  // 匿名ユーザーが2つ目以上のタスクを追加しようとした時に再促進
+  if (isAdding && !isLoggedIn?.() && isFirstTaskCleared()) {
+    const nonFirst = DB.get(DB.K.tasks).filter(t => !t._isFirst);
+    if (nonFirst.length === 1) { // 今追加した1件目の非ファーストタスク
+      setTimeout(() => openLoginPrompt('second'), 400);
+    }
+  }
 }
 
 function deleteTask() {
@@ -2165,6 +2212,17 @@ function bindEvents() {
   });
 
   // task modal
+  // login prompt modal
+  document.getElementById('btn-login-prompt-register')?.addEventListener('click', () => {
+    closeLoginPrompt();
+    openAuthModal('register');
+  });
+  document.getElementById('btn-login-prompt-skip')?.addEventListener('click', closeLoginPrompt);
+  document.getElementById('modal-login-prompt')?.addEventListener('click', e => {
+    if (e.target === document.getElementById('modal-login-prompt')) closeLoginPrompt();
+  });
+
+  // task modal
   document.getElementById('modal-task-close').addEventListener('click', closeTaskModal);
   document.getElementById('btn-save-task').addEventListener('click', saveTask);
   document.getElementById('btn-delete-task').addEventListener('click', deleteTask);
@@ -2443,9 +2501,40 @@ function bindEvents() {
   });
 
   // reset
-  document.getElementById('btn-reset').addEventListener('click', () => {
+  document.getElementById('btn-reset').addEventListener('click', async () => {
     if (!confirm('全データを削除します。元に戻せません。')) return;
-    Object.values(DB.K).forEach(k => localStorage.removeItem(k));
+    // メモリキャッシュをリセット
+    _cache[DB.K.tasks]             = [];
+    _cache[DB.K.logs]              = [];
+    _cache[DB.K.period_days]       = [];
+    _cache[DB.K.settings]          = null;
+    _cache[DB.K.partner]           = null;
+    _cache[DB.K.unlocked]          = [];
+    _cache[DB.K.dismissed_suggest] = [];
+    _cache[DB.K.title_shown]       = [];
+    _cache[DB.K.tutorial_cleared]  = false;
+    // ログイン済みの場合は Firestore のデータも削除
+    if (isLoggedIn?.()) {
+      const uid = getUserId?.();
+      if (uid && typeof _db !== 'undefined' && _db) {
+        try {
+          await Promise.all([
+            _db.collection('users').doc(uid).set(
+              { settings: null, tutorial_cleared: false, unlocked: [], dismissed_suggest: [], title_shown: [] },
+              { merge: false }
+            ),
+            ...['tasks','logs','period_days'].map(async col => {
+              const snap = await _db.collection('users').doc(uid).collection(col).get();
+              const batch = _db.batch();
+              snap.docs.forEach(d => batch.delete(d.ref));
+              if (snap.docs.length) await batch.commit();
+            }),
+          ]);
+        } catch (e) {
+          console.warn('[Reset] Firestore削除失敗:', e);
+        }
+      }
+    }
     initData();
     switchScreen('calendar');
     showToast('リセットしました');
@@ -2756,7 +2845,6 @@ if ('serviceWorker' in navigator) {
 // ----------------------------------------------------------------
 // 19. 起動
 // ----------------------------------------------------------------
-initData();
 bindEvents();
 bindUnlockEvents();
 bindAuthEvents();
@@ -2789,28 +2877,15 @@ initAuth();
 onAuthReady(async user => {
   try {
     if (user && !user.isAnonymous) {
-      // 実アカウントでログイン済み → クラウドデータを同期
+      // 実アカウントでログイン済み → Firestore からキャッシュを初期化して同期開始
       await onUserSignedIn(user);
-    } else if (user && user.isAnonymous) {
-      // 匿名ログイン済み → リアルタイム同期は不要（単独デバイス利用のため）
-      // startRealtimeSync は実アカウントのみで使用する
+    } else {
+      // 未ログイン（または匿名）→ initData でメモリキャッシュにファーストタスクを初期化して描画
+      // 匿名ログインは廃止。Firestore への書き込みは一切しない。
+      initData();
       renderCalendar?.();
       renderTaskList?.();
       renderSettings?.();
-    } else if (FIREBASE_CONFIGURED) {
-      // 未ログイン → Googleリダイレクト結果を待つため少し待機してから匿名ログイン
-      // （Redirectログイン後の復帰時は onAuthStateChanged が実アカウントで発火するため
-      //   ここでは匿名を作らず、getRedirectResult の完了を待つ）
-      await new Promise(r => setTimeout(r, 800));
-      // まだ未ログインのままなら匿名ログイン
-      if (!firebase.auth().currentUser) {
-        try {
-          await firebase.auth().signInAnonymously();
-          // 匿名ユーザーはローカル専用のため startRealtimeSync は呼ばない
-        } catch (e) {
-          console.warn('[Auth] 匿名ログイン失敗:', e);
-        }
-      }
     }
   } catch (e) {
     console.warn('[Splash] 初期化中にエラー:', e);
