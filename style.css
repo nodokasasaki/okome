@@ -629,6 +629,18 @@ html, body {
   margin-top: 8px; font-family: var(--font);
 }
 
+/* ログイン促進モーダルのスキップボタン
+   スマホでのタップ領域を44px以上確保しつつ控えめに表示 */
+.login-prompt-skip-btn {
+  width: 100%; min-height: 44px; padding: 10px;
+  background: transparent; color: var(--muted);
+  border: none; border-radius: var(--r);
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+}
+.login-prompt-skip-btn:active { opacity: .6; }
+
 /* ================================================================
    Toast
    ================================================================ */
