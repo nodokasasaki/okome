@@ -1,13 +1,17 @@
 
 # おうちリズム — 環境一覧
 
-| 環境 | URL | 更新タイミング |
-|------|-----|---------------|
-| **本番環境**（Firebase Hosting・統一URL） | https://kakusan-25200.web.app/ | `git push origin main`（GitHub Actions で自動更新） |
-| **開発環境**（Cloudflare プレビュー） | https://okomedev.pages.dev/ | `git push origin dev` のたびに自動更新 |
-| **本番環境（旧）**（Cloudflare Pages） | https://ouchirhythm.pages.dev/ | `git push origin main` のたびに自動更新 |
-| **本番環境**（GitHub Pages） | https://nodokasasaki.github.io/okome/ | `git push origin main` のたびに自動更新 |
-| **ローカル開発** | http://localhost:8080 | `python3 -m http.server 8080` で手動起動 |
+> **注意：おうちリズムはブラウザ動作のみを保証するウェブアプリです。**
+> manifest.json・Service Worker は存在せず、PWA（プログレッシブウェブアプリ）ではありません。
+> iOS/Android のホーム画面追加は可能ですが、オフライン動作・プッシュ通知はサポートしていません。
+
+| 環境 | URL | 用途 | 更新タイミング |
+|------|-----|------|---------------|
+| **本番環境**（Firebase Hosting・統一URL） | https://kakusan-25200.web.app/ | エンドユーザー向け正式URL | `git push origin main`（GitHub Actions で自動更新） |
+| **本番環境**（GitHub Pages） | https://nodokasasaki.github.io/okome/ | エンドユーザー向け（Firebase Hosting と同内容） | `git push origin main` のたびに自動更新 |
+| **開発確認用**（Cloudflare Pages・devブランチ） | https://okomedev.pages.dev/ | **開発者専用プレビュー**（エンドユーザーは使用しない） | `git push origin dev` のたびに自動更新 |
+| **開発確認用（旧）**（Cloudflare Pages・mainブランチ） | https://ouchirhythm.pages.dev/ | **開発者専用**（エンドユーザーへの案内不要） | `git push origin main` のたびに自動更新 |
+| **ローカル開発** | http://localhost:8080 | 開発者専用 | `python3 -m http.server 8080` で手動起動 |
 
 ---
 
@@ -138,7 +142,7 @@ Firebase コンソール → Authentication → 「設定」タブ → 「承認
    ```
    https://<FIREBASE_PROJECT_ID>.firebaseapp.com/__/auth/handler
    ```
-   ※ `authDomain` は `pages.dev` ではなく `firebaseapp.com` を使っているため、リダイレクトURIは Supabase 的な自サイトURLではなく Firebase のハンドラーURLです。
+   ※ `authDomain` は `<FIREBASE_PROJECT_ID>.web.app` に統一しています。Firebase Hosting 上では `web.app` ドメインの `/__/auth/handler` は Firebase が自動処理するため、リダイレクト URI への追加は不要です。`firebaseapp.com` 側は Firebase SDK が内部的に使用するため引き続き登録が必要です。
 
 ### Step 8 — OAuth 同意画面のテストユーザー設定（アプリが「テスト」状態の場合）
 

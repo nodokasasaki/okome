@@ -7,6 +7,8 @@
       "**/node_modules/**",
       "build.sh",
       "DEPLOY.md",
+      "KAKUSAN_PLAN.md",
+      "SHORTCUT_GUIDE.md",
       "package.json",
       "package-lock.json"
     ],
@@ -40,12 +42,21 @@
           },
           {
             "key": "Content-Security-Policy",
-            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*.firebaseio.com https://www.gstatic.com; frame-src https://accounts.google.com https://*.firebaseapp.com; font-src 'self'; object-src 'none'; base-uri 'self';"
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://*.googleapis.com https://*.firebaseio.com https://firestore.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com wss://*.firebaseio.com https://www.gstatic.com; frame-src https://accounts.google.com https://*.firebaseapp.com https://*.web.app; font-src 'self'; object-src 'none'; base-uri 'self';"
           }
         ]
       },
       {
         "source": "index.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "lp/index.html",
         "headers": [
           {
             "key": "Cache-Control",
