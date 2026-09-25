@@ -75,7 +75,9 @@ function _shouldFallbackToRedirect(err) {
     'auth/operation-not-supported-in-this-environment',
     'auth/web-storage-unsupported',
     'auth/internal-error',
-    'auth/unauthorized-domain',
+    // 'auth/unauthorized-domain' は意図的に除外：
+    // ドメイン未承認はリダイレクトに切り替えても解決しないため、
+    // フォールバックしてもエラーが繰り返されるだけでUXが悪化する。
     'auth/popup-closed-by-browser',
   ].includes(err?.code);
 }
@@ -212,6 +214,7 @@ async function initAuth() {
     _authReady = true;
     _authReadyCallbacks.forEach(cb => cb(null));
     _authReadyCallbacks = [];
+    updateAuthUI(null);
   }
 }
 
