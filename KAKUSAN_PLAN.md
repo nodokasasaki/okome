@@ -14,9 +14,12 @@
 | 正式URL | https://kakusan-25200.web.app/ |
 | GitHub Pages URL | https://nodokasasaki.github.io/okome/ |
 | Cloudflare Pages | 開発者専用プレビュー環境（エンドユーザー向けではない） |
-| LPページ | **未作成**（現在 index.html がアプリ本体のみ） |
-| SNSアカウント | **未作成** |
-| OGP設定 | 未対応 |
+| LPページ | ✅ **作成済み** `lp/index.html` → https://kakusan-25200.web.app/lp/ |
+| OGP画像 | ✅ **作成済み** `lp/og-image.svg` |
+| OGP設定 | ✅ **対応済み**（LP の `<head>` に og: / twitter: タグ設定済み） |
+| SNSアカウント | ⬜ **未作成**（X アカウント開設が必要） |
+| AI自動投稿スクリプト | ✅ **作成済み** `.github/scripts/auto-post.js` |
+| GitHub Actions ワークフロー | ✅ **作成済み** `.github/workflows/sns-auto-post.yml` |
 
 ---
 
@@ -24,9 +27,9 @@
 
 | # | 施策 | 優先度 | AI自動化度 | ステータス |
 |---|------|--------|------------|------------|
-| ① | ランディングページ（LP）構築 | 🔴 最高 | 手動（一度だけ作成） | ⬜ 未着手 |
-| ② | OGP・SNSシェア設定 | 🔴 最高 | 手動（一度だけ設定） | ⬜ 未着手 |
-| ③ | SNSアカウント開設・AI自動投稿 | 🔴 最高 | ★★★ 全自動 | ⬜ 未着手 |
+| ① | ランディングページ（LP）構築 | 🔴 最高 | 手動（一度だけ作成） | ✅ 完了 |
+| ② | OGP・SNSシェア設定 | 🔴 最高 | 手動（一度だけ設定） | ✅ 完了 |
+| ③ | SNSアカウント開設・AI自動投稿 | 🔴 最高 | ★★★ 全自動 | 🔧 スクリプト完成・アカウント開設待ち |
 | ④ | SEO対策（sitemap.xml / robots.txt） | 🟡 中 | ★★ 半自動 | ⬜ 未着手 |
 | ⑤ | プレスリリース（PR Times など） | 🟡 中 | 手動 | ⬜ 未着手 |
 | ⑥ | リファラル機能（友達招待） | 🟢 低 | ★★ 半自動 | ⬜ 未着手 |
@@ -162,12 +165,12 @@ jobs:
 | `X_ACCESS_SECRET` | X アクセスシークレット |
 
 ### 着手タスク
-- [ ] X（Twitter）アカウント開設（アカウント名案：`@ouchirhythm`）
-- [ ] X Developer Portal でアプリ登録・API キー取得
-- [ ] OpenAI API キー取得
-- [ ] `.github/scripts/auto-post.js` を作成
-- [ ] `.github/workflows/sns-auto-post.yml` を作成
-- [ ] GitHub Repository Secrets に各キーを登録
+- [ ] X（Twitter）アカウント開設（アカウント名案：`@ouchirhythm`）← **あなたが手動で行う**
+- [ ] X Developer Portal でアプリ登録・API キー取得 ← **あなたが手動で行う**
+- [ ] OpenAI API キー取得 ← **あなたが手動で行う**
+- [x] `.github/scripts/auto-post.js` を作成
+- [x] `.github/workflows/sns-auto-post.yml` を作成
+- [ ] GitHub Repository Secrets に各キーを登録 ← **あなたが手動で行う**
 - [ ] 動作確認（手動トリガーで1回テスト投稿）
 
 ---
