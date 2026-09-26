@@ -1,0 +1,44 @@
+name: SNS Auto Post
+
+# ----------------------------------------------------------------
+# スケジュール：週3回（月・木・土）JST 9:00〜10:00 に投稿
+# UTC で設定（JST = UTC+9）
+# ----------------------------------------------------------------
+on:
+  schedule:
+    - cron: '0 0 * * 1'   # 月曜 09:00 JST
+    - cron: '0 0 * * 4'   # 木曜 09:00 JST
+    - cron: '0 1 * * 6'   # 土曜 10:00 JST
+  # 手動トリガー（テスト投稿用）
+  workflow_dispatch:
+    inputs:
+      post_index:
+        description: 'POST_INDEX（0=tips / 1=seasonal / 2=feature）'
+        required: false
+        default: '0'
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run auto-post script
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          X_API_KEY: ${{ secrets.X_API_KEY }}
+          X_API_SECRET: ${{ secrets.X_API_SECRET }}
+          X_ACCESS_TOKEN: ${{ secrets.X_ACCESS_TOKEN }}
+          X_ACCESS_SECRET: ${{ secrets.X_ACCESS_SECRET }}
+          # workflow_dispatch で手動指定した場合はそれを使用、
+          # スケジュール実行時は空文字（スクリプト内で日付ベースで自動決定）
+          POST_INDEX: ${{ github.event.inputs.post_index || '' }}
+        run: node .github/scripts/auto-post.js
