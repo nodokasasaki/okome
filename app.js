@@ -148,11 +148,13 @@ function initData() {
 // ----------------------------------------------------------------
 // 3. 日付ユーティリティ
 // ----------------------------------------------------------------
+// ローカル日付を YYYY-MM-DD に整形（toISOString は UTC のため日本時間で1日ずれる）
+const _ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 const D = {
-  today() { return new Date().toISOString().slice(0, 10); },
+  today() { return _ymd(new Date()); },
   addDays(s, n) {
     const d = new Date(s + 'T00:00:00'); d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return _ymd(d);
   },
   diff(a, b) { return Math.floor((new Date(a + 'T00:00:00') - new Date(b + 'T00:00:00')) / 86400000); },
   jpShort(s) {
@@ -553,14 +555,23 @@ function renderCalendar() {
   // filter tasks by genre
   const filteredTasks = calGenreFilter === 'all' ? tasks : tasks.filter(t => t.genre === calGenreFilter);
 
-  // date -> Set of genre colors
+  // date -> Map(taskId -> task)（日付マス内にタスク名を表示するため）
   // ループ上限を設けて無限ループを防ぐ
-  const dateDots = {};
+  const dateTasks = {};
+  const addDateTask = (ds, t) => {
+    if (!dateTasks[ds]) dateTasks[ds] = new Map();
+    dateTasks[ds].set(t.id, t);
+  };
   const cycleDays_limit = 500; // 最大ループ回数
+  // 完了済みの記録もその日のマスに表示する
+  const filteredIds = new Map(filteredTasks.map(t => [t.id, t]));
+  logs.forEach(l => {
+    const t = filteredIds.get(l.taskId);
+    if (t && l.completedAt >= monthStart && l.completedAt <= monthEnd) addDateTask(l.completedAt, t);
+  });
   filteredTasks.forEach(t => {
     const due = nextDue(t);
     const cycleD = getCycleDays(t);
-    const color  = getGenre(t.genre).color;
 
     // monthStart〜monthEnd の各日が due から cycleD の倍数日後かチェック
     // 直接計算：monthStart からの日差が cycleD の倍数になる日を列挙
@@ -585,8 +596,7 @@ function renderCalendar() {
     let cur = firstInMonth;
     let safety = 0;
     while (cur <= monthEnd && safety < cycleDays_limit) {
-      if (!dateDots[cur]) dateDots[cur] = new Set();
-      dateDots[cur].add(color);
+      addDateTask(cur, t);
       cur = D.addDays(cur, cycleD);
       safety++;
     }
@@ -605,7 +615,7 @@ function renderCalendar() {
     const prevMonth = calMonth === 0 ? 12 : calMonth;
     const prevYear  = calMonth === 0 ? calYear - 1 : calYear;
     const ds = `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(prevLast - i).padStart(2,'0')}`;
-    html += `<div class="cal-day other-month" data-date="${ds}">${prevLast - i}</div>`;
+    html += `<div class="cal-day other-month" data-date="${ds}"><span class="cal-day-num">${prevLast - i}</span></div>`;
     count++;
   }
 
@@ -616,13 +626,16 @@ function renderCalendar() {
     if (ds === today)             cls += ' today';
     if (ds === calSelectedDate && ds !== today) cls += ' selected';
 
-    const dots = dateDots[ds];
-    let dotHtml = '';
-    if (dots && dots.size) {
-      const colors = [...dots].slice(0, 3);
-      dotHtml = `<div class="cal-day-dots">${colors.map(c => `<div class="cal-dot" style="background:${c}"></div>`).join('')}</div>`;
-    }
-    html += `<div class="${cls}" data-date="${ds}">${d}${dotHtml}</div>`;
+    // Googleカレンダー風：マス内にタスク名チップを最大3件、超過分は「+N」
+    const dayTasks = dateTasks[ds] ? [...dateTasks[ds].values()] : [];
+    const MAX_CHIPS = 3;
+    let chipHtml = dayTasks.slice(0, MAX_CHIPS).map(t => {
+      const g = getGenre(t.genre);
+      const done = isDoneOn(t.id, ds);
+      return `<div class="cal-chip ${done ? 'done' : ''}" style="background:${g.bg};color:${g.color};border-left-color:${g.color};">${_escapeHtml(t.name)}</div>`;
+    }).join('');
+    if (dayTasks.length > MAX_CHIPS) chipHtml += `<div class="cal-chip-more">+${dayTasks.length - MAX_CHIPS}</div>`;
+    html += `<div class="${cls}" data-date="${ds}"><span class="cal-day-num">${d}</span><div class="cal-chips">${chipHtml}</div></div>`;
     count++;
   }
 
@@ -632,7 +645,7 @@ function renderCalendar() {
     const nextMonth = calMonth === 11 ? 1 : calMonth + 2;
     const nextYear  = calMonth === 11 ? calYear + 1 : calYear;
     const ds = `${nextYear}-${String(nextMonth).padStart(2,'0')}-${String(nm).padStart(2,'0')}`;
-    html += `<div class="cal-day other-month" data-date="${ds}">${nm}</div>`;
+    html += `<div class="cal-day other-month" data-date="${ds}"><span class="cal-day-num">${nm}</span></div>`;
     nm++; count++;
   }
 
@@ -785,15 +798,9 @@ function renderDayPanel(date) {
   const welcomeEl = document.getElementById('cal-welcome-panel');
   if (welcomeEl) welcomeEl.style.display = 'none';
 
-  // 日付ラベルを同期（day-panel-date-top: DayPanel内ヘッダー、setup-banner-date: バナー内）
-  const dayPanelDateTop = document.getElementById('day-panel-date-top');
-  if (dayPanelDateTop) dayPanelDateTop.textContent = D.jpFull(date);
+  // 日付ラベルを同期（setup-banner-date: バナー内）
   const setupDateEl = document.getElementById('setup-banner-date');
   if (setupDateEl) setupDateEl.textContent = D.jpFull(date);
-
-  // 「タスクを追加」ボタン：過去日・今日どちらも常に表示
-  const addTaskBtn = document.getElementById('btn-day-add-task');
-  if (addTaskBtn) addTaskBtn.style.display = '';
 
   const tasks  = DB.get(DB.K.tasks);
 
@@ -821,14 +828,11 @@ function renderDayPanel(date) {
   });
   const dueTasks = allDueTasks.filter(t => !isDoneOn(t.id, date));
 
-  const noTaskBanner = document.getElementById('cal-no-task-suggest');
   const listEl = document.getElementById('day-task-list');
   if (allDueTasks.length === 0) {
-    if (noTaskBanner) noTaskBanner.style.display = '';
     listEl.innerHTML = '';
     return;
   }
-  if (noTaskBanner) noTaskBanner.style.display = 'none';
 
   listEl.innerHTML = dueTasks.map(t => {
     const g = getGenre(t.genre);
@@ -1525,6 +1529,11 @@ function renderPeriodCal() {
 }
 
 function renderPeriod() {
+  // 周期の設定値（設定画面から移動）
+  const ps = DB.getObj(DB.K.settings, DEFAULT_SETTINGS);
+  document.getElementById('setting-cycle').value      = ps.cycleLength || 28;
+  document.getElementById('setting-period-len').value = ps.periodLen   || 5;
+
   const phase  = getCurrentPhase();
   const pred   = getPeriodPrediction();
   const ranges = getPeriodRanges();
@@ -1653,8 +1662,6 @@ function renderSettings() {
   const s = DB.getObj(DB.K.settings, DEFAULT_SETTINGS);
   document.getElementById('setting-home-type').value   = s.homeType    || '1ldk';
   document.getElementById('setting-clean-level').value = s.cleanLevel  || 'normal';
-  document.getElementById('setting-cycle').value        = s.cycleLength || 28;
-  document.getElementById('setting-period-len').value   = s.periodLen   || 5;
 
   // 未ログインユーザー向け：データが永続化されないことを警告してアカウント登録を促す
   const anonWarning = document.getElementById('anon-user-warning');
@@ -1670,6 +1677,7 @@ function saveSettings() {
     cycleLength: Number(document.getElementById('setting-cycle').value),
     periodLen:   Number(document.getElementById('setting-period-len').value),
   });
+  if (currentScreen === 'period') renderPeriod(); // 予測を新しい周期で再計算
   showToast('設定を保存しました');
 }
 
@@ -1715,6 +1723,14 @@ function guessGenre(name) {
   return null;
 }
 
+// モーダルで現在割り当てられているジャンル（null = 未判定 → 保存時 'other'）
+let modalGenre = null;
+function updateGenreHint() {
+  const hintEl = document.getElementById('genre-auto-hint');
+  if (!hintEl) return;
+  hintEl.textContent = modalGenre ? getGenre(modalGenre).label : '未設定（タスク名から自動判定）';
+}
+
 function openTaskModal(taskId = null) {
   editingTaskId = taskId;
   document.getElementById('modal-task-title-text').textContent = taskId ? 'タスクを編集' : 'タスクを追加';
@@ -1723,12 +1739,12 @@ function openTaskModal(taskId = null) {
     const t = DB.get(DB.K.tasks).find(t => t.id === taskId);
     if (!t) return;
     document.getElementById('input-task-name').value  = t.name;
-    document.getElementById('input-task-genre').value = t.genre;
     document.getElementById('input-task-memo').value  = t.memo || '';
     setRadio('input-task-cycle', t.cycle || 'none');
     setRadio('input-task-diff',  t.diff  || 'easy');
     document.getElementById('input-custom-days').value = t.customDays || 3;
-    document.getElementById('custom-days-row').style.display = t.cycle === 'custom' ? 'flex' : 'none';
+    document.getElementById('custom-days-row').classList.toggle('show', t.cycle === 'custom');
+    modalGenre = t.genre || null;
   } else {
     document.getElementById('input-task-name').value  = '';
     document.getElementById('input-task-memo').value  = '';
@@ -1736,12 +1752,11 @@ function openTaskModal(taskId = null) {
     setRadio('input-task-cycle', '');
     setRadio('input-task-diff',  'easy');
     document.getElementById('input-custom-days').value = 3;
-    document.getElementById('custom-days-row').style.display = 'none';
-    // ジャンル：未選択状態（タスク名入力で自動推定）
-    document.getElementById('input-task-genre').value = '';
-    const hintEl = document.getElementById('genre-auto-hint');
-    if (hintEl) { hintEl.textContent = 'タスク名から自動設定'; hintEl.style.display = ''; }
+    document.getElementById('custom-days-row').classList.remove('show');
+    // ジャンル：未判定（タスク名入力で自動推定）
+    modalGenre = null;
   }
+  updateGenreHint();
   document.getElementById('modal-task').classList.remove('hidden');
 }
 
@@ -1778,9 +1793,8 @@ function saveTask() {
   if (cycle === 'custom' && (!customDays || customDays < 1)) {
     showToast('日数を1以上で入力してください'); return;
   }
-  // ジャンル：未選択ならタスク名から自動推定、それでも不明なら 'other'
-  const genreEl = document.getElementById('input-task-genre');
-  const genre = genreEl.value || guessGenre(name) || 'other';
+  // ジャンル：タスク名から自動推定、判定できなければ 'other'（その他）で保存
+  const genre = modalGenre || guessGenre(name) || 'other';
   const payload = {
     name,
     genre,
@@ -2114,13 +2128,6 @@ function bindEvents() {
     if (card) openTaskModal(card.dataset.edit);
   });
 
-  // タスクなし提案バナーのボタン
-  const goAddTaskBtn = document.getElementById('btn-go-add-task-banner');
-  if (goAddTaskBtn) goAddTaskBtn.addEventListener('click', () => {
-    document.querySelector('.nav-item[data-screen="tasks"]')?.click();
-    setTimeout(() => document.getElementById('btn-add-task')?.click(), 150);
-  });
-
   // ウェルカムパネルのファーストタスクをクリック（トグル）
   document.getElementById('cal-welcome-panel').addEventListener('click', e => {
     const card = e.target.closest('.welcome-first-task');
@@ -2201,16 +2208,6 @@ function bindEvents() {
   // add task
   document.getElementById('btn-add-task').addEventListener('click', () => openTaskModal());
 
-  // カレンダー：日パネル「タスクを追加」ボタン
-  document.getElementById('btn-day-add-task')?.addEventListener('click', () => {
-    openTaskModal();
-  });
-
-  // カレンダー：日パネル「完了を記録」ボタン
-  document.getElementById('btn-day-record')?.addEventListener('click', () => {
-    openRecordModal(calSelectedDate);
-  });
-
   // task modal
   // login prompt modal
   document.getElementById('btn-login-prompt-register')?.addEventListener('click', () => {
@@ -2232,36 +2229,31 @@ function bindEvents() {
   ['input-task-cycle','input-task-diff'].forEach(gid => {
     document.getElementById(gid).addEventListener('click', e => {
       const b = e.target.closest('.radio-btn'); if (!b) return;
-      setRadio(gid, b.dataset.val);
       if (gid === 'input-task-cycle') {
-        document.getElementById('custom-days-row').style.display =
-          b.dataset.val === 'custom' ? 'flex' : 'none';
+        // 周期は選択中をもう一度タップで解除（= 1回だけのタスク）
+        const val = b.classList.contains('active') ? '' : b.dataset.val;
+        setRadio(gid, val);
+        document.getElementById('custom-days-row').classList.toggle('show', val === 'custom');
+        return;
       }
+      setRadio(gid, b.dataset.val);
     });
   });
 
-  // タスク名入力でジャンルを自動推定（新規追加時のみ）
+  // 日数指定の −/＋ ステッパー
+  document.getElementById('custom-days-row').addEventListener('click', e => {
+    const b = e.target.closest('.cycle-step'); if (!b) return;
+    const input = document.getElementById('input-custom-days');
+    const v = (Number(input.value) || 1) + Number(b.dataset.step);
+    input.value = Math.min(999, Math.max(1, v));
+  });
+
+  // タスク名入力でジャンルを自動推定（判定できた場合のみ更新）
   document.getElementById('input-task-name').addEventListener('input', e => {
-    if (editingTaskId) return; // 編集時は変更しない
-    const name = e.target.value.trim();
-    const guessed = guessGenre(name);
-    const genreEl = document.getElementById('input-task-genre');
-    const hintEl  = document.getElementById('genre-auto-hint');
-    if (guessed) {
-      genreEl.value = guessed;
-      if (hintEl) {
-        const g = getGenre(guessed);
-        hintEl.textContent = `→ ${g.label} に自動設定`;
-        hintEl.style.display = '';
-      }
-    } else {
-      // 推定できない場合はジャンル未選択に戻す
-      genreEl.value = '';
-      if (hintEl) {
-        hintEl.textContent = 'タスク名から自動設定';
-        hintEl.style.display = '';
-      }
-    }
+    const guessed = guessGenre(e.target.value.trim());
+    if (guessed) modalGenre = guessed;
+    else if (!editingTaskId) modalGenre = null; // 新規時は判定不能なら未設定に戻す
+    updateGenreHint();
   });
 
   // 生理ミニカレンダー ナビゲーション
@@ -2484,20 +2476,21 @@ function bindEvents() {
     document.getElementById(id).addEventListener('change', saveSettings)
   );
 
-  // export
-  document.getElementById('btn-export').addEventListener('click', () => {
-    const data = {
-      tasks:   DB.get(DB.K.tasks),
-      logs:    DB.get(DB.K.logs),
-      periods: DB.get(DB.K.periods),
-      settings: DB.getObj(DB.K.settings, DEFAULT_SETTINGS),
-      exportedAt: new Date().toISOString(),
-    };
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(data,null,2)], {type:'application/json'}));
-    a.download = `ouchi-rhythm-${D.today()}.json`;
-    a.click();
-    showToast('エクスポートしました');
+  // 初回セットアップ（住まい・掃除レベル）
+  ['onboarding-home-type','onboarding-clean-level'].forEach(gid => {
+    document.getElementById(gid).addEventListener('click', e => {
+      const b = e.target.closest('.radio-btn'); if (b) setRadio(gid, b.dataset.val);
+    });
+  });
+  document.getElementById('btn-onboarding-save').addEventListener('click', () => {
+    DB.set(DB.K.settings, {
+      ...DEFAULT_SETTINGS,
+      homeType:   getRadio('onboarding-home-type')   || DEFAULT_SETTINGS.homeType,
+      cleanLevel: getRadio('onboarding-clean-level') || DEFAULT_SETTINGS.cleanLevel,
+    });
+    document.getElementById('modal-onboarding').classList.add('hidden');
+    renderSettings(); renderCalendar(); renderTaskList();
+    showToast('設定しました');
   });
 
   // reset
@@ -2890,8 +2883,12 @@ onAuthReady(async user => {
   } catch (e) {
     console.warn('[Splash] 初期化中にエラー:', e);
   }
-  // ブラウザを開くたびにスプラッシュを表示
-  showSplash();
+  // 住まい・掃除レベルが未設定（初回起動）ならセットアップを表示、それ以外はスプラッシュ
+  if (DB.getObj(DB.K.settings, null) === null) {
+    document.getElementById('modal-onboarding').classList.remove('hidden');
+  } else {
+    showSplash();
+  }
 });
 
 // ----------------------------------------------------------------
@@ -3162,10 +3159,16 @@ onAuthReady(async user => {
 (function () {
   const nav = document.querySelector('.bottom-nav');
   if (!nav) return;
+  // かくさんもナビと連動して隠す（タスクとの重なり防止）
+  const chara = document.getElementById('chara-float');
+  const toggleHidden = hidden => {
+    nav.classList.toggle('nav--hidden', hidden);
+    chara?.classList.toggle('chara--hidden', hidden);
+  };
 
-  const HIDE_THRESHOLD = 60;   // これ以上スクロールダウンしたら隠す
+  const HIDE_THRESHOLD = 6;    // 少しでも下にスクロールしたら隠す
   const SHOW_BUFFER    = 10;   // 上に少し戻ったら即表示
-  const TOP_GUARD      = 80;   // ページ上端付近は常に表示
+  const TOP_GUARD      = 40;   // ページ上端付近は常に表示
 
   let lastY = 0;
   let ticking = false;
@@ -3176,7 +3179,7 @@ onAuthReady(async user => {
     requestAnimationFrame(() => {
       // PC（768px以上）ではサイドバーなので何もしない
       if (window.innerWidth >= 768) {
-        nav.classList.remove('nav--hidden');
+        toggleHidden(false);
         lastY = window.scrollY;
         ticking = false;
         return;
@@ -3187,13 +3190,13 @@ onAuthReady(async user => {
 
       if (currentY < TOP_GUARD) {
         // ページ最上部付近は常に表示
-        nav.classList.remove('nav--hidden');
+        toggleHidden(false);
       } else if (delta > HIDE_THRESHOLD) {
         // 大きく下にスクロール → 隠す
-        nav.classList.add('nav--hidden');
+        toggleHidden(true);
       } else if (delta < -SHOW_BUFFER) {
         // 少しでも上にスクロール → 表示
-        nav.classList.remove('nav--hidden');
+        toggleHidden(false);
       }
 
       lastY = currentY;

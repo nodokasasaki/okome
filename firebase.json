@@ -8,6 +8,7 @@
       "build.sh",
       "DEPLOY.md",
       "KAKUSAN_PLAN.md",
+      "KAKUSAN_SPEC.md",
       "SHORTCUT_GUIDE.md",
       "package.json",
       "package-lock.json"

@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <!-- preload: キャラ画像（初期描画に使用） -->
   <link rel="preload" as="image" href="kakusann.webp" type="image/webp">
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css?v=20261011">
 </head>
 <body>
 <div id="app">
@@ -82,32 +82,8 @@
     </div>
   </div>
 
-  <!-- タスクなし提案バナー（JS制御） -->
-  <div class="cal-no-task-suggest" id="cal-no-task-suggest" style="display:none;">
-    <p class="cal-no-task-suggest-text">この日のタスクはありません</p>
-    <p class="cal-no-task-suggest-sub">タスクを設定しませんか？</p>
-    <button class="cal-no-task-suggest-btn" id="btn-go-add-task-banner">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-      タスクを追加する
-    </button>
-  </div>
-
   <!-- Day detail panel（ファーストタスク完了後に表示） -->
   <div class="day-panel">
-    <!-- 日付 & ボタン行 -->
-    <div class="day-panel-header" id="day-panel-header-row">
-      <div class="day-panel-date" id="day-panel-date-top"></div>
-      <div class="day-panel-actions">
-        <button class="day-panel-add day-panel-add-task" id="btn-day-add-task" style="display:none;">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M12 5v14M5 12h14"/></svg>
-          タスクを追加
-        </button>
-        <button class="day-panel-add" id="btn-day-record">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M5 13l4 4L19 7"/></svg>
-          完了を記録
-        </button>
-      </div>
-    </div>
     <div class="day-task-list" id="day-task-list"></div>
   </div>
 </div>
@@ -194,6 +170,21 @@
     <div class="cal-days period-cal-days" id="period-cal-days"></div>
   </div>
 
+  <!-- 生理周期の設定（設定画面から移動） -->
+  <div class="setting-section-header">周期の設定</div>
+  <div class="setting-row">
+    <div><div class="setting-label">平均周期（日）</div></div>
+    <div class="setting-ctrl">
+      <input type="number" class="setting-input" id="setting-cycle" min="21" max="45" value="28">
+    </div>
+  </div>
+  <div class="setting-row">
+    <div><div class="setting-label">平均生理日数</div></div>
+    <div class="setting-ctrl">
+      <input type="number" class="setting-input" id="setting-period-len" min="2" max="10" value="5">
+    </div>
+  </div>
+
   <div style="display:flex; align-items:center; justify-content:space-between; padding:14px 18px 6px; flex-wrap:wrap; gap:8px;">
     <div style="font-size:13px; font-weight:700; color:var(--muted);">記録一覧</div>
     <button id="btn-open-share" style="
@@ -265,24 +256,8 @@
   </div>
 
   <div class="divider-bar"></div>
-  <div class="setting-section-header">生理周期</div>
-  <div class="setting-row">
-    <div><div class="setting-label">平均周期（日）</div></div>
-    <div class="setting-ctrl">
-      <input type="number" class="setting-input" id="setting-cycle" min="21" max="45" value="28">
-    </div>
-  </div>
-  <div class="setting-row">
-    <div><div class="setting-label">平均生理日数</div></div>
-    <div class="setting-ctrl">
-      <input type="number" class="setting-input" id="setting-period-len" min="2" max="10" value="5">
-    </div>
-  </div>
-
-  <div class="divider-bar"></div>
   <div class="setting-section-header">データ管理</div>
   <div style="padding:14px 18px; display:flex; flex-direction:column; gap:10px;">
-    <button class="btn-secondary" id="btn-export">JSONでエクスポート</button>
     <button class="btn-danger" id="btn-reset">全データをリセット</button>
   </div>
   <div style="padding:16px 18px 32px; font-size:12px; color:var(--muted); line-height:1.8;">
@@ -347,40 +322,24 @@
     <div class="form-group">
       <label class="form-label">タスク名</label>
       <input type="text" class="form-input" id="input-task-name" placeholder="例：トイレ掃除">
+      <div class="genre-auto-row">ジャンル <span id="genre-auto-hint" class="genre-auto-hint"></span></div>
     </div>
     <div class="form-group">
-      <label class="form-label">ジャンル <span id="genre-auto-hint" class="genre-auto-hint"></span></label>
-      <select class="form-select" id="input-task-genre">
-        <option value="">（タスク名から自動設定）</option>
-        <option value="toilet">トイレ</option>
-        <option value="kitchen">キッチン</option>
-        <option value="bath">浴室</option>
-        <option value="wash">洗面台</option>
-        <option value="living">リビング</option>
-        <option value="bedroom">寝室</option>
-        <option value="entrance">玄関</option>
-        <option value="window">窓・ベランダ</option>
-        <option value="other">その他</option>
-      </select>
-    </div>
-    <div class="form-group">
-      <label class="form-label">周期 <span style="font-size:11px;font-weight:500;color:var(--muted);">（省略可）</span></label>
-      <div class="radio-group" id="input-task-cycle">
-        <button class="radio-btn" data-val="none">なし</button>
+      <label class="form-label">くり返し <span style="font-size:11px;font-weight:500;color:var(--muted);">（未選択なら1回だけのタスク）</span></label>
+      <div class="radio-group cycle-seg" id="input-task-cycle">
         <button class="radio-btn" data-val="daily">毎日</button>
-        <button class="radio-btn" data-val="weekly">週1</button>
-        <button class="radio-btn" data-val="monthly">月1</button>
+        <button class="radio-btn" data-val="weekly">毎週</button>
+        <button class="radio-btn" data-val="monthly">毎月</button>
         <button class="radio-btn" data-val="season">3ヶ月</button>
-        <button class="radio-btn" data-val="yearly">年1</button>
-        <button class="radio-btn" data-val="custom">〇日ごと</button>
+        <button class="radio-btn" data-val="yearly">毎年</button>
+        <button class="radio-btn" data-val="custom">日数指定</button>
       </div>
-    </div>
-    <div id="custom-days-row" style="display:none; align-items:center; gap:8px; padding:4px 0 8px;">
-      <label class="form-label" style="margin:0; white-space:nowrap;">日数</label>
-      <input type="number" id="input-custom-days" class="setting-input"
-        min="1" max="999" value="3"
-        style="width:80px; text-align:center;">
-      <span style="font-size:13px; color:var(--muted);">日ごとに実施</span>
+      <div class="cycle-custom" id="custom-days-row">
+        <button type="button" class="cycle-step" data-step="-1">−</button>
+        <input type="number" id="input-custom-days" min="1" max="999" value="3" inputmode="numeric">
+        <span class="cycle-custom-unit">日ごと</span>
+        <button type="button" class="cycle-step" data-step="1">＋</button>
+      </div>
     </div>
     <div class="form-group">
       <label class="form-label">難易度</label>
@@ -613,6 +572,39 @@
 </div>
 
 <!-- ================================================================
+     MODAL: 初回セットアップ（住まい・掃除レベル）
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-onboarding">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="border:none; padding-bottom:0;">
+      <span>はじめに教えてね</span>
+    </div>
+    <div style="font-size:13px; color:var(--muted); margin:4px 0 16px; line-height:1.7;">
+      おうちに合ったタスクを提案するために使います。あとから設定画面で変更できます。
+    </div>
+    <div class="form-group">
+      <label class="form-label">住居タイプ</label>
+      <div class="radio-group cycle-seg onboarding-seg" id="onboarding-home-type">
+        <button class="radio-btn" data-val="1k">1K・1R</button>
+        <button class="radio-btn active" data-val="1ldk">1LDK</button>
+        <button class="radio-btn" data-val="2ldk">2LDK</button>
+        <button class="radio-btn" data-val="3ldk">3LDK以上</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label">掃除レベル</label>
+      <div class="radio-group cycle-seg" id="onboarding-clean-level">
+        <button class="radio-btn" data-val="light">ゆるめ</button>
+        <button class="radio-btn active" data-val="normal">普通</button>
+        <button class="radio-btn" data-val="strict">しっかり</button>
+      </div>
+    </div>
+    <button class="btn-primary" id="btn-onboarding-save">はじめる</button>
+  </div>
+</div>
+
+<!-- ================================================================
      SPLASH: 今日のおむかえ（1日1回）
      ================================================================ -->
 <div class="splash-overlay hidden" id="splash-overlay">
@@ -784,6 +776,6 @@
 <script src="firebase-config.js"></script>
 <script src="db-cloud.js"></script>
 <script src="auth.js"></script>
-<script src="app.js"></script>
+<script src="app.js?v=20261011"></script>
 </body>
 </html>
