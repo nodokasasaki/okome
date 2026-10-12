@@ -296,6 +296,8 @@ GitHub の cron は UTC で動き、混んでいると数分〜数十分遅れ�
 | 7 | JSONエクスポート | 設定画面にボタンあり | 削除 |
 | 8 | カレンダー | 小さい日付マス＋色ドット。下に「この日のタスクはありません」バナーと日付・ボタン行 | Googleカレンダー風の大きいマスにタスク名を表示。バナーと日付・ボタン行は削除 |
 | 9 | 日付計算 | `toISOString()`（UTC）で日付を作るため、日本時間 0〜9時は前日扱い | ローカル時刻で `YYYY-MM-DD` を作る |
+| 10 | タスクの日付 | 指定できない（くり返しは完了日から、単発は常に今日に表示） | タスク名の上に日付欄（「今日」／「日付を選ぶ」）。くり返しの場合は開始日 |
+| 11 | タスク追加・編集モーダル中のかくさん | モーダルの前面に表示され、メモ欄などと重なる | モーダル表示中は非表示 |
 
 難易度（軽め／普通／重め）は据え置き。スコア計算 `estimateTaskScore()` のベース係数として使い続ける。
 
@@ -304,6 +306,7 @@ GitHub の cron は UTC で動き、混んでいると数分〜数十分遅れ�
 - 下部ナビの自動非表示処理（`app.js` 末尾の Bottom Nav IIFE）で、`.bottom-nav` に `nav--hidden`、`#chara-float` に `chara--hidden` を同時に付け外しする
 - `.chara-float.chara--hidden` は `translateY` で画面外に移動し `opacity: 0`。子要素の `pointer-events` も無効にする
 - PC（768px 以上）では常に表示
+- タスク追加・編集モーダル（`#modal-task`）の表示中は非表示：`body:has(#modal-task:not(.hidden)) .chara-float { display: none; }`
 
 | 定数 | 値 | 意味 |
 |------|----|------|
@@ -312,6 +315,20 @@ GitHub の cron は UTC で動き、混んでいると数分〜数十分遅れ�
 | `TOP_GUARD` | 40 | ページ上端からこの範囲内は常に表示 |
 
 ### 9.3 タスク追加・編集モーダル
+
+**項目の並び**：日付 → タスク名（＋ジャンル）→ くり返し → 難易度 → メモ
+
+**日付**
+- `#task-date-pick`：「今日」ボタン（`.date-chip[data-offset="0"]`）と「日付を選ぶ」ボタン（`.date-chip-picker`。透明な `input[type=date]#input-task-date` を重ねる）
+- 今日以外を選ぶと「日付を選ぶ」ボタンに日付（`D.jpFull()`）を表示し、選択中の色にする
+- 状態は `modalDate`（選択中の日付）と `modalDateDirty`（編集時に日付を変えたか）で管理し、`setModalDate(date)` で表示を更新
+- 新規追加：カレンダーで選択中の日が初期値（過去日なら今日）。保存時は常に `startDate` を保存
+- 編集：次回予定日（`nextDue()`）を表示。日付を変えた場合のみ `startDate` を保存
+
+**`startDate` と `nextDue(task)`**
+- 単発タスク（`cycle: 'none'`）：未完了なら `startDate`（なければ今日）を返す
+- くり返し：`startDate` が `lastDone` より後ならそれを返し、そうでなければこれまで通り完了日から周期で数える
+- 既存タスクは `startDate` を持たないため、動きは変わらない
 
 **ジャンル**
 - `<select id="input-task-genre">` を廃止し、タスク名入力欄の下に `ジャンル <span id="genre-auto-hint">` を表示

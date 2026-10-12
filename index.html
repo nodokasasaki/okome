@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <!-- preload: キャラ画像（初期描画に使用） -->
   <link rel="preload" as="image" href="kakusann.webp" type="image/webp">
-  <link rel="stylesheet" href="style.css?v=20261011">
+  <link rel="stylesheet" href="style.css?v=20261012">
 </head>
 <body>
 <div id="app">
@@ -319,6 +319,17 @@
     </div>
     <input type="hidden" id="edit-task-id">
 
+    <div class="form-group">
+      <label class="form-label">日付 <span style="font-size:11px;font-weight:500;color:var(--muted);">（くり返しの場合は開始日）</span></label>
+      <div class="date-pick" id="task-date-pick">
+        <button type="button" class="date-chip" data-offset="0">今日</button>
+        <label class="date-chip date-chip-picker">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>
+          <span id="task-date-label"></span>
+          <input type="date" id="input-task-date" aria-label="日付を選ぶ">
+        </label>
+      </div>
+    </div>
     <div class="form-group">
       <label class="form-label">タスク名</label>
       <input type="text" class="form-input" id="input-task-name" placeholder="例：トイレ掃除">
@@ -776,6 +787,6 @@
 <script src="firebase-config.js"></script>
 <script src="db-cloud.js"></script>
 <script src="auth.js"></script>
-<script src="app.js?v=20261011"></script>
+<script src="app.js?v=20261012"></script>
 </body>
 </html>

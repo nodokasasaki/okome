@@ -192,9 +192,11 @@ function getCycleLabel(task) {
 
 function nextDue(task) {
   if (task.cycle === 'none') {
-    // 単発タスク：lastDoneがあれば完了済みなので遠い未来、なければ今日
-    return task.lastDone ? D.addDays(task.lastDone, 99999) : D.today();
+    // 単発タスク：lastDoneがあれば完了済みなので遠い未来、なければ指定日（未指定なら今日）
+    return task.lastDone ? D.addDays(task.lastDone, 99999) : (task.startDate || D.today());
   }
+  // くり返し：指定日（startDate）が最後の完了日より後なら、その日を次回予定日にする
+  if (task.startDate && (!task.lastDone || task.startDate > task.lastDone)) return task.startDate;
   if (!task.lastDone) return D.today();
   return D.addDays(task.lastDone, getCycleDays(task));
 }
@@ -1725,6 +1727,22 @@ function guessGenre(name) {
 
 // モーダルで現在割り当てられているジャンル（null = 未判定 → 保存時 'other'）
 let modalGenre = null;
+// タスクモーダルの日付（選択中の日付と、ユーザーが変更したか）
+let modalDate = null;
+let modalDateDirty = false;
+function setModalDate(date) {
+  modalDate = date;
+  const today = D.today();
+  document.getElementById('input-task-date').value = date;
+  document.querySelectorAll('#task-date-pick .date-chip[data-offset]').forEach(b => {
+    b.classList.toggle('active', D.addDays(today, Number(b.dataset.offset)) === date);
+  });
+  const isOther = date !== today;
+  const picker = document.querySelector('#task-date-pick .date-chip-picker');
+  picker.classList.toggle('active', isOther);
+  document.getElementById('task-date-label').textContent = isOther ? D.jpFull(date) : '日付を選ぶ';
+}
+
 function updateGenreHint() {
   const hintEl = document.getElementById('genre-auto-hint');
   if (!hintEl) return;
@@ -1745,6 +1763,9 @@ function openTaskModal(taskId = null) {
     document.getElementById('input-custom-days').value = t.customDays || 3;
     document.getElementById('custom-days-row').classList.toggle('show', t.cycle === 'custom');
     modalGenre = t.genre || null;
+    // 次回予定日を表示（完了済みの単発タスクは遠い未来になるので今日を表示）
+    const due = nextDue(t);
+    setModalDate(D.diff(due, D.today()) > 3650 ? D.today() : due);
   } else {
     document.getElementById('input-task-name').value  = '';
     document.getElementById('input-task-memo').value  = '';
@@ -1755,7 +1776,10 @@ function openTaskModal(taskId = null) {
     document.getElementById('custom-days-row').classList.remove('show');
     // ジャンル：未判定（タスク名入力で自動推定）
     modalGenre = null;
+    // 日付：カレンダーで選択中の日（過去日なら今日）
+    setModalDate(calSelectedDate && calSelectedDate >= D.today() ? calSelectedDate : D.today());
   }
+  modalDateDirty = false;
   updateGenreHint();
   document.getElementById('modal-task').classList.remove('hidden');
 }
@@ -1803,6 +1827,8 @@ function saveTask() {
     diff:  getRadio('input-task-diff') || 'easy',
     memo:  document.getElementById('input-task-memo').value.trim(),
   };
+  // 日付：新規は常に保存、編集は変更したときだけ保存（予定日を動かす）
+  if (!editingTaskId || modalDateDirty) payload.startDate = modalDate || D.today();
   const tasks = DB.get(DB.K.tasks);
   const isAdding = !editingTaskId;
   if (editingTaskId) {
@@ -2238,6 +2264,18 @@ function bindEvents() {
       }
       setRadio(gid, b.dataset.val);
     });
+  });
+
+  // タスクの日付選択（今日／明日／カレンダーから選ぶ）
+  document.getElementById('task-date-pick').addEventListener('click', e => {
+    const b = e.target.closest('.date-chip[data-offset]'); if (!b) return;
+    setModalDate(D.addDays(D.today(), Number(b.dataset.offset)));
+    modalDateDirty = true;
+  });
+  document.getElementById('input-task-date').addEventListener('change', e => {
+    if (!e.target.value) return;
+    setModalDate(e.target.value);
+    modalDateDirty = true;
   });
 
   // 日数指定の −/＋ ステッパー
