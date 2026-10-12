@@ -139,7 +139,23 @@ function xWeightedLength(text) {
 // ----------------------------------------------------------------
 // Gemini API でツイート文生成
 // ----------------------------------------------------------------
-function generateTweet(theme, ctx) {
+async function generateTweet(theme, ctx) {
+  const models = ['gemini-2.5-flash', 'gemini-1.5-flash'];
+  let lastError = null;
+
+  for (const model of models) {
+    try {
+      return await callGemini(model, theme, ctx);
+    } catch (err) {
+      lastError = err;
+      console.warn(`[auto-post] ${model} での生成に失敗、次のモデルを試行します:`, err.message);
+    }
+  }
+
+  throw lastError || new Error('Gemini API による生成に失敗しました');
+}
+
+function callGemini(model, theme, ctx) {
   return new Promise((resolve, reject) => {
     const prompt = theme.prompt(ctx);
     const body = JSON.stringify({
@@ -164,7 +180,7 @@ function generateTweet(theme, ctx) {
     const apiKey = encodeURIComponent(process.env.GEMINI_API_KEY || '');
     const options = {
       hostname: 'generativelanguage.googleapis.com',
-      path: `/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      path: `/v1beta/models/${model}:generateContent?key=${apiKey}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
