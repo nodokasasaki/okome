@@ -10,6 +10,7 @@
       "KAKUSAN_PLAN.md",
       "KAKUSAN_SPEC.md",
       "SHORTCUT_GUIDE.md",
+      "lp/og-image.svg",
       "package.json",
       "package-lock.json"
     ],
@@ -76,6 +77,15 @@
       },
       {
         "source": "firebase-config.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "@(robots.txt|sitemap.xml)",
         "headers": [
           {
             "key": "Cache-Control",

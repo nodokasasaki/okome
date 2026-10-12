@@ -3,11 +3,11 @@
  *
  * 動作：
  *   1. 現在の曜日・月・季節をもとに投稿テーマを決定
- *   2. OpenAI API でツイート文を生成
+ *   2. Gemini API でツイート文を生成
  *   3. X (Twitter) API v2 で投稿
  *
  * 必要な GitHub Secrets:
- *   OPENAI_API_KEY
+ *   GEMINI_API_KEY
  *   X_API_KEY
  *   X_API_SECRET
  *   X_ACCESS_TOKEN
@@ -85,9 +85,16 @@ function buildContext() {
   const now = new Date();
   const month = now.getMonth() + 1;
   const day = now.getDay();
-  // 投稿回数をGitHub Actions実行インデックスで変化させる
-  // 環境変数 POST_INDEX が未設定なら日付ベースで決定
-  const idx = parseInt(process.env.POST_INDEX || String(now.getDate()), 10);
+  // 投稿インデックスの優先順:
+  //   1. POST_INDEX（手動実行で指定）
+  //   2. GITHUB_RUN_NUMBER（Actions が毎回インクリメントする連番 → テーマが循環しズレる）
+  //   3. 日にち（ローカル実行時のフォールバック）
+  const idx = parseInt(
+    process.env.POST_INDEX ||
+    process.env.GITHUB_RUN_NUMBER ||
+    String(now.getDate()),
+    10,
+  );
 
   return {
     month,
@@ -99,32 +106,68 @@ function buildContext() {
 }
 
 // ----------------------------------------------------------------
-// OpenAI API でツイート文生成
+// X の文字数カウント（twitter-text 相当）
+//   - ASCII/半角1バイト文字 → 1カウント
+//   - それ以外（日本語・全角など） → 2カウント
+//   - URL は長さにかかわらず一律 23カウント
+// ----------------------------------------------------------------
+const URL_WEIGHT = 23; // X の t.co 短縮後の重み
+
+function xWeightedLength(text) {
+  // まず URL を URL_WEIGHT に置換して計算する
+  const urlRegex = /https?:\/\/\S+/g;
+  let length = 0;
+  let lastIndex = 0;
+  let match;
+  while ((match = urlRegex.exec(text)) !== null) {
+    // URL より前の部分を計算
+    const before = text.slice(lastIndex, match.index);
+    for (const ch of before) {
+      length += ch.codePointAt(0) <= 0x7f ? 1 : 2;
+    }
+    length += URL_WEIGHT;
+    lastIndex = match.index + match[0].length;
+  }
+  // URL より後ろの残り部分
+  const rest = text.slice(lastIndex);
+  for (const ch of rest) {
+    length += ch.codePointAt(0) <= 0x7f ? 1 : 2;
+  }
+  return length;
+}
+
+// ----------------------------------------------------------------
+// Gemini API でツイート文生成
 // ----------------------------------------------------------------
 function generateTweet(theme, ctx) {
   return new Promise((resolve, reject) => {
     const prompt = theme.prompt(ctx);
     const body = JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
+      system_instruction: {
+        parts: [
+          {
+            text: '家事・暮らし系SNSアカウントの運用担当です。フレンドリーで親しみやすく、実用的なツイートを書きます。絵文字を1〜2個自然に使います。',
+          },
+        ],
+      },
+      contents: [
         {
-          role: 'system',
-          content:
-            '家事・暮らし系SNSアカウントの運用担当です。フレンドリーで親しみやすく、実用的なツイートを書きます。絵文字を1〜2個自然に使います。',
+          parts: [{ text: prompt }],
         },
-        { role: 'user', content: prompt },
       ],
-      max_tokens: 200,
-      temperature: 0.85,
+      generationConfig: {
+        temperature: 0.85,
+        maxOutputTokens: 200,
+      },
     });
 
+    const apiKey = encodeURIComponent(process.env.GEMINI_API_KEY || '');
     const options = {
-      hostname: 'api.openai.com',
-      path: '/v1/chat/completions',
+      hostname: 'generativelanguage.googleapis.com',
+      path: `/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         'Content-Length': Buffer.byteLength(body),
       },
     };
@@ -135,9 +178,9 @@ function generateTweet(theme, ctx) {
       res.on('end', () => {
         try {
           const json = JSON.parse(data);
-          if (json.error) return reject(new Error(`OpenAI error: ${json.error.message}`));
-          const text = json.choices?.[0]?.message?.content?.trim();
-          if (!text) return reject(new Error('OpenAI: 空のレスポンス'));
+          if (json.error) return reject(new Error(`Gemini error: ${json.error.message || JSON.stringify(json.error)}`));
+          const text = json.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+          if (!text) return reject(new Error('Gemini: 空のレスポンス'));
           resolve(text);
         } catch (e) {
           reject(e);
@@ -145,6 +188,9 @@ function generateTweet(theme, ctx) {
       });
     });
     req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy(new Error('Gemini API タイムアウト（30秒）'));
+    });
     req.write(body);
     req.end();
   });
@@ -230,6 +276,9 @@ function postTweet(text) {
       });
     });
     req.on('error', reject);
+    req.setTimeout(30000, () => {
+      req.destroy(new Error('X API タイムアウト（30秒）'));
+    });
     req.write(body);
     req.end();
   });
@@ -239,7 +288,7 @@ function postTweet(text) {
 // シークレット存在確認
 // ----------------------------------------------------------------
 function checkSecrets() {
-  const required = ['OPENAI_API_KEY', 'X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_SECRET'];
+  const required = ['GEMINI_API_KEY', 'X_API_KEY', 'X_API_SECRET', 'X_ACCESS_TOKEN', 'X_ACCESS_SECRET'];
   const missing = required.filter((k) => !process.env[k]);
   if (missing.length > 0) {
     throw new Error(`必須シークレットが未設定です: ${missing.join(', ')}`);
@@ -263,11 +312,27 @@ async function main() {
   const baseText = await generateTweet(theme, ctx);
   console.log(`[auto-post] 生成テキスト: ${baseText}`);
 
-  // ハッシュタグ＋URLを付加（140字制限を考慮して調整）
-  const fullText = `${baseText}\n\n${HASHTAGS}\n${APP_URL}`;
-  const finalText = fullText.length > 280 ? baseText.slice(0, 200) + `…\n\n${HASHTAGS}\n${APP_URL}` : fullText;
+  // ハッシュタグ＋URLを付加
+  // X の文字数カウント（日本語2、URL=23）で 280 以内に収める
+  const suffix = `\n\n${HASHTAGS}\n${APP_URL}`;
+  const suffixWeight = xWeightedLength(suffix);
+  // 本文を X カウントで (280 - suffixWeight) 以内に切り詰める
+  const maxBodyWeight = 280 - suffixWeight;
+  let trimmedBase = baseText;
+  if (xWeightedLength(baseText) > maxBodyWeight) {
+    let w = 0;
+    let i = 0;
+    for (const ch of baseText) {
+      const charW = ch.codePointAt(0) <= 0x7f ? 1 : 2;
+      if (w + charW > maxBodyWeight - 2) break; // '…' は全角=2
+      w += charW;
+      i += ch.length; // サロゲートペア対応
+    }
+    trimmedBase = baseText.slice(0, i) + '…';
+  }
+  const finalText = trimmedBase + suffix;
 
-  console.log(`[auto-post] 最終テキスト（${finalText.length}字）:\n${finalText}`);
+  console.log(`[auto-post] 最終テキスト（X換算${xWeightedLength(finalText)}字）:\n${finalText}`);
 
   // 投稿
   const result = await postTweet(finalText);

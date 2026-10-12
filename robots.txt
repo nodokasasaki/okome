@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+Disallow: /node_modules/
+Sitemap: https://kakusan-25200.web.app/sitemap.xml

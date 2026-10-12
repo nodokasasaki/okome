@@ -132,7 +132,7 @@ flowchart LR
 |------|------|
 | 実行環境 | Node.js 20（GitHub Actions `ubuntu-latest`） |
 | 依存パッケージ | なし（Node.js 標準の `https` と `crypto` のみ） |
-| 生成AI | OpenAI Chat Completions API（`gpt-4o-mini`、`max_tokens: 200`、`temperature: 0.85`） |
+| 生成AI | Gemini API（`gemini-2.0-flash`、無料枠） |
 | 投稿先 | X API v2 `POST https://api.twitter.com/2/tweets` |
 | X の認証方式 | OAuth 1.0a（HMAC-SHA1 署名をスクリプト内で生成） |
 | 失敗時 | エラーメッセージを出して終了コード 1 で終了（Actions のジョブも失敗になる） |
@@ -143,13 +143,13 @@ flowchart LR
 sequenceDiagram
   participant GA as GitHub Actions
   participant S as auto-post.js
-  participant O as OpenAI API
+  participant G as Gemini API
   participant X as X API v2
   GA->>S: node auto-post.js（環境変数で Secrets を渡す）
   S->>S: checkSecrets() 必須の環境変数5つを確認
   S->>S: buildContext() 季節・曜日・テーマ・タスク例を決める
-  S->>O: generateTweet() 投稿文を生成
-  O-->>S: 本文
+  S->>G: generateTweet() 投稿文を生成
+  G-->>S: 本文
   S->>S: ハッシュタグとLPのURLを付ける・長さを調整
   S->>X: postTweet()（OAuth 1.0a 署名付き）
   X-->>S: tweet_id
@@ -203,7 +203,7 @@ https://kakusan-25200.web.app/lp/
 
 | 変数 | 必須 | 渡し方 | 内容 |
 |------|------|--------|------|
-| `OPENAI_API_KEY` | ✅ | GitHub Secrets | OpenAI APIキー |
+| `GEMINI_API_KEY` | ✅ | GitHub Secrets | Google AI Studio（Gemini）APIキー（無料） |
 | `X_API_KEY` | ✅ | GitHub Secrets | X の Consumer Key |
 | `X_API_SECRET` | ✅ | GitHub Secrets | X の Consumer Secret |
 | `X_ACCESS_TOKEN` | ✅ | GitHub Secrets | X のアクセストークン |
