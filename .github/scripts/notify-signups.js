@@ -16,7 +16,9 @@
 
 'use strict';
 
-const admin = require('firebase-admin');
+const { initializeApp, cert } = require('firebase-admin/app');
+const { getAuth } = require('firebase-admin/auth');
+const { getFirestore, FieldValue } = require('firebase-admin/firestore');
 
 const STATE_COLLECTION = '_system';
 const STATE_DOC = 'signupNotifier';
@@ -96,9 +98,9 @@ async function main() {
     throw new Error('FIREBASE_ADMIN_SERVICE_ACCOUNT が正しい JSON ではありません');
   }
 
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  const auth = admin.auth();
-  const stateRef = admin.firestore().collection(STATE_COLLECTION).doc(STATE_DOC);
+  initializeApp({ credential: cert(serviceAccount) });
+  const auth = getAuth();
+  const stateRef = getFirestore().collection(STATE_COLLECTION).doc(STATE_DOC);
 
   const registered = await listRegisteredUsers(auth);
   const snap = await stateRef.get();
@@ -107,7 +109,7 @@ async function main() {
   if (!snap.exists) {
     await stateRef.set({
       notifiedUids: registered.map((u) => u.uid),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      updatedAt: FieldValue.serverTimestamp(),
     });
     console.info(JSON.stringify({ level: 'INFO', msg: 'baseline created', count: registered.length }));
     return;
@@ -128,7 +130,7 @@ async function main() {
   // 通知成功後に状態を更新（削除済みユーザーは自然に除外される）
   await stateRef.set({
     notifiedUids: registered.map((u) => u.uid),
-    updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp(),
   });
   console.info(JSON.stringify({ level: 'INFO', msg: 'notified', count: newUsers.length }));
 }
