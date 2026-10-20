@@ -1,0 +1,11 @@
+{
+  "name": "okome-github-scripts",
+  "private": true,
+  "description": "GitHub Actions 用スクリプトの依存関係",
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "firebase-admin": "^14.5.0"
+  }
+}

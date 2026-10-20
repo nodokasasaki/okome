@@ -22,3 +22,7 @@ npm-debug.log*
 
 # Firebase config（実際のAPIキーが含まれるためコミット対象外）
 firebase-config.js
+
+# Firebase サービスアカウント鍵（絶対にコミットしない）
+*-firebase-adminsdk-*.json
+serviceAccount*.json

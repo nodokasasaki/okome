@@ -1,0 +1,45 @@
+name: Notify New Signups
+
+# ----------------------------------------------------------------
+# 約1時間ごとに新規登録者をチェックし、Discord に通知する
+# （GitHub Actions のスケジュールは数分〜遅延することがあります）
+# ----------------------------------------------------------------
+on:
+  schedule:
+    - cron: '17 * * * *'
+  # 手動実行（動作確認用）
+  workflow_dispatch:
+
+# 二重実行による重複通知を防ぐ
+concurrency:
+  group: notify-signups
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: .github/scripts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: .github/scripts
+        run: npm ci
+
+      - name: Notify new signups
+        env:
+          FIREBASE_ADMIN_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_ADMIN_SERVICE_ACCOUNT }}
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: node .github/scripts/notify-signups.js

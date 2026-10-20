@@ -156,6 +156,21 @@ Google Cloud Console → 「APIとサービス」→「OAuth 同意画面」を�
 設定完了後、ローカルサーバー（`python3 -m http.server 8080`）で起動し、
 「設定」画面の「アカウント・同期」エリアに「ログイン」ボタンが表示されれば完了。
 
+## 新規登録通知（Discord）
+
+GitHub Actions（`.github/workflows/notify-signups.yml`）が約1時間ごとに Firebase Auth を確認し、
+新規登録者（匿名以外）がいれば Discord に通知します。メールアドレス等の個人情報は送信しません。
+
+### 必要な GitHub Secrets
+
+| シークレット名 | 内容 |
+|---|---|
+| `DISCORD_WEBHOOK_URL` | Discord チャンネル設定 → 連携サービス → ウェブフック で作成した URL |
+| `FIREBASE_ADMIN_SERVICE_ACCOUNT` | Firebase コンソール → プロジェクト設定 → サービスアカウント → 新しい秘密鍵を生成 した JSON の中身全体 |
+
+> ⚠️ 秘密鍵 JSON はリポジトリにコミットしないこと。Secrets 登録後はローカルの JSON を削除してください。
+> 初回実行時は既存ユーザーを「通知済み」として記録するだけで通知は送りません（状態は Firestore `_system/signupNotifier`）。
+
 ---
 
 
