@@ -101,6 +101,7 @@ const _cache = {
   or2_period_days:       [],
   or2_settings:          null,  // null = 未初期化（DEFAULT_SETTINGS を使う）
   or2_partner:           null,
+  or2_cosmetics:         [],
   or2_unlocked:          [],
   or2_dismissed_suggest: [],
   or2_title_shown:       [],
@@ -109,7 +110,7 @@ const _cache = {
 
 const DB = {
   // period_days: { date:'2024-01-01', flow:'normal'|'light'|'heavy'|'none', symptoms:[], memo:'' }
-  K: { tasks: 'or2_tasks', logs: 'or2_logs', period_days: 'or2_period_days', settings: 'or2_settings', partner: 'or2_partner', unlocked: 'or2_unlocked', dismissed_suggest: 'or2_dismissed_suggest', title_shown: 'or2_title_shown', tutorial_cleared: 'or2_tutorial_cleared' },
+  K: { tasks: 'or2_tasks', logs: 'or2_logs', period_days: 'or2_period_days', settings: 'or2_settings', partner: 'or2_partner', unlocked: 'or2_unlocked', dismissed_suggest: 'or2_dismissed_suggest', title_shown: 'or2_title_shown', tutorial_cleared: 'or2_tutorial_cleared', cosmetics: 'or2_cosmetics' },
   get(k)       { const v = _cache[k]; return Array.isArray(v) ? v : (v ?? []); },
   getObj(k, d) { const v = _cache[k]; return v !== null && v !== undefined ? v : d; },
   set(k, v)    { _cache[k] = v; },
@@ -2058,6 +2059,7 @@ function switchScreen(name) {
   if (name === 'tasks')    renderTaskList();
   if (name === 'period')   renderPeriod();
   if (name === 'settings') renderSettings();
+  if (name === 'cosme')    renderCosme();
   document.dispatchEvent(new CustomEvent('screenChanged', { detail: name }));
 }
 
@@ -2538,6 +2540,7 @@ function bindEvents() {
     _cache[DB.K.tasks]             = [];
     _cache[DB.K.logs]              = [];
     _cache[DB.K.period_days]       = [];
+    _cache[DB.K.cosmetics]         = [];
     _cache[DB.K.settings]          = null;
     _cache[DB.K.partner]           = null;
     _cache[DB.K.unlocked]          = [];
@@ -2554,7 +2557,7 @@ function bindEvents() {
               { settings: null, tutorial_cleared: false, unlocked: [], dismissed_suggest: [], title_shown: [] },
               { merge: false }
             ),
-            ...['tasks','logs','period_days'].map(async col => {
+            ...['tasks','logs','period_days','cosmetics'].map(async col => {
               const snap = await _db.collection('users').doc(uid).collection(col).get();
               const batch = _db.batch();
               snap.docs.forEach(d => batch.delete(d.ref));
@@ -3052,6 +3055,11 @@ onAuthReady(async user => {
         'からだの記録\nちゃんとつけてえらい！',
         'じぶんを大切にね！',
         'かくさんも心配して\nみてるからね…！',
+      ],
+      cosme: [
+        'コスメの記録だよ！\n使い切れたかな？',
+        'お気に入り、\nどれくらいもつかな〜',
+        'ちょうどいい買い時が\nわかるといいね！',
       ],
       settings: [
         '設定画面だよ！\nカスタマイズしてね',

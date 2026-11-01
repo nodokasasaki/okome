@@ -94,6 +94,10 @@ async function downloadCloudDataToCache(uid) {
     const periodsSnap = await _userCol(uid, 'period_days').get(opts);
     _cache[DB.K.period_days] = periodsSnap.docs.map(d => d.data());
 
+    // cosmetics
+    const cosmeSnap = await _userCol(uid, 'cosmetics').get(opts);
+    _cache[DB.K.cosmetics] = cosmeSnap.docs.map(d => d.data());
+
     console.log('[DB] クラウドデータを _cache に読み込みました');
     return true;
   } catch (e) {
@@ -114,7 +118,7 @@ function startRealtimeSync(uid) {
 
   // onSnapshot 登録直後の初回コールバックをスキップ
   // （downloadCloudDataToCache で取得済みのデータをキャッシュベースの初回コールバックで上書きしない）
-  let _skip = { tasks: true, logs: true, period_days: true, meta: true };
+  let _skip = { tasks: true, logs: true, period_days: true, cosmetics: true, meta: true };
 
   // tasks
   _unsubscribers.push(
@@ -145,6 +149,16 @@ function startRealtimeSync(uid) {
       _cache[DB.K.period_days] = snap.docs.map(d => d.data());
       renderPeriod?.();
     }, err => console.warn('[Sync] period_days:', err))
+  );
+
+  // cosmetics
+  _unsubscribers.push(
+    _userCol(uid, 'cosmetics').onSnapshot(snap => {
+      if (_skip.cosmetics) { _skip.cosmetics = false; return; }
+      if (snap.metadata.hasPendingWrites) return;
+      _cache[DB.K.cosmetics] = snap.docs.map(d => d.data());
+      if (typeof renderCosme === 'function') renderCosme();
+    }, err => console.warn('[Sync] cosmetics:', err))
   );
 
   // meta（serverTimestamp 解決で2回コールバックが来るため変化検出あり）
@@ -213,6 +227,9 @@ async function _cloudWrite(uid, k, v) {
       break;
     case DB.K.period_days:
       await _syncCollection(uid, 'period_days', v, 'date');
+      break;
+    case DB.K.cosmetics:
+      await _syncCollection(uid, 'cosmetics', v, 'id');
       break;
     case DB.K.settings:
     case DB.K.tutorial_cleared:
@@ -299,6 +316,7 @@ async function _doUserSignedIn(uid) {
     renderCalendar?.();
     renderTaskList?.();
     renderPeriod?.();
+    if (typeof renderCosme === 'function') renderCosme();
     renderSettings?.();
   }
 }

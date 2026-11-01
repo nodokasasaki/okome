@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
   <!-- preload: キャラ画像（初期描画に使用） -->
   <link rel="preload" as="image" href="kakusann.webp" type="image/webp">
-  <link rel="stylesheet" href="style.css?v=20261012">
+  <link rel="stylesheet" href="style.css?v=20261013">
 </head>
 <body>
 <div id="app">
@@ -199,6 +199,35 @@
 </div>
 
 <!-- ================================================================
+     SCREEN: COSME（コスメの消費リズム）
+     ================================================================ -->
+<div class="screen" id="screen-cosme">
+  <!-- スマホ用トップバー -->
+  <div class="topbar">
+    <div class="topbar-left">
+      <div>
+        <div class="topbar-title">コスメ</div>
+        <div class="topbar-sub" id="cosme-sub"></div>
+      </div>
+    </div>
+    <button class="topbar-btn" id="btn-add-cosme" aria-label="コスメを登録">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+  <!-- PC用ページヘッダー -->
+  <div class="pc-page-header" style="display:none;" id="pc-header-cosme">
+    <div>
+      <div class="pc-page-header-title">コスメ</div>
+      <div class="pc-page-header-sub" id="cosme-sub-pc"></div>
+    </div>
+    <button class="topbar-btn" id="btn-add-cosme-pc" aria-label="コスメを登録">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+  </div>
+  <div id="cosme-body"></div>
+</div>
+
+<!-- ================================================================
      SCREEN: SETTINGS
      ================================================================ -->
 <div class="screen" id="screen-settings">
@@ -295,6 +324,15 @@
     生理
     <div class="nav-dot"></div>
   </button>
+  <button class="nav-item" data-screen="cosme">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="8" y="11" width="8" height="10" rx="1.5"/>
+      <path d="M9.5 11V8.5h5V11"/>
+      <path d="M10 8.5V3h4v5.5"/>
+    </svg>
+    コスメ
+    <div class="nav-dot"></div>
+  </button>
   <button class="nav-item" data-screen="settings">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <circle cx="12" cy="12" r="3"/>
@@ -366,6 +404,50 @@
     </div>
     <button class="btn-primary" id="btn-save-task">保存する</button>
     <button class="btn-danger" id="btn-delete-task" style="display:none;">このタスクを削除</button>
+  </div>
+</div>
+
+<!-- ================================================================
+     MODAL: コスメ登録/編集
+     ================================================================ -->
+<div class="modal-overlay hidden" id="modal-cosme">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">
+      <span id="cosme-modal-title-text">コスメを登録</span>
+      <button class="modal-close" id="modal-cosme-close" aria-label="閉じる">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <input type="hidden" id="input-cosme-id">
+
+    <div class="form-group cosme-name-group">
+      <label class="form-label" for="input-cosme-name">商品名</label>
+      <input type="text" class="form-input" id="input-cosme-name" maxlength="60" autocomplete="off" placeholder="例：化粧水、ハトムギ、雪肌精">
+      <div class="cosme-suggest" id="cosme-suggest" style="display:none;"></div>
+      <div class="cosme-hint">2文字以上入力すると候補が出ます（カタカナ名はひらがなでも探せます）。候補に無いものはそのまま入力して登録できます。</div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="input-cosme-category">カテゴリ</label>
+      <select class="form-select" id="input-cosme-category"></select>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="input-cosme-opened">使い始めた日</label>
+      <input type="date" class="form-input" id="input-cosme-opened">
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="input-cosme-finished">使い切った日 <span style="font-size:11px;font-weight:500;color:var(--muted);">（使用中なら空のまま）</span></label>
+      <div class="cosme-date-row">
+        <input type="date" class="form-input" id="input-cosme-finished">
+        <button type="button" class="cosme-btn cosme-btn-sm" id="btn-clear-cosme-finished">クリア</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label class="form-label" for="input-cosme-memo">メモ（任意）</label>
+      <textarea class="form-textarea" id="input-cosme-memo" maxlength="200" placeholder="使用感、リピートするかなど"></textarea>
+    </div>
+    <button class="btn-primary" id="btn-save-cosme">保存する</button>
+    <button class="btn-danger" id="btn-delete-cosme" style="display:none;">この記録を削除</button>
   </div>
 </div>
 
@@ -788,5 +870,7 @@
 <script src="db-cloud.js"></script>
 <script src="auth.js"></script>
 <script src="app.js?v=20261012"></script>
+<script src="cosme-master.js?v=20261013"></script>
+<script src="cosme.js?v=20261013"></script>
 </body>
 </html>

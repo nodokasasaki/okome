@@ -2517,3 +2517,96 @@ body:has(#modal-task:not(.hidden)) .chara-float { display: none; }
   transition: transform .2s;
   flex-shrink: 0;
 }
+
+/* ================================================================
+   コスメ（消費リズム）
+   ================================================================ */
+.cosme-summary {
+  margin: 14px 16px 4px; padding: 16px 16px 14px;
+  background: var(--g100); border: 1.5px solid var(--border);
+  border-radius: var(--r); text-align: center;
+}
+.cosme-summary-main { display: flex; align-items: baseline; justify-content: center; gap: 4px; }
+.cosme-summary-num  { font-size: 38px; font-weight: 800; color: var(--g700); line-height: 1; }
+.cosme-summary-unit { font-size: 14px; font-weight: 700; color: var(--g700); }
+.cosme-summary-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
+.cosme-chips { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin-top: 12px; }
+.cosme-chip {
+  background: var(--white); border: 1px solid var(--border2); border-radius: 20px;
+  padding: 4px 10px; font-size: 12px; color: var(--ink2);
+}
+.cosme-chip b { color: var(--g700); }
+.cosme-chip small { color: var(--muted); margin-left: 2px; }
+
+.cosme-list { padding: 4px 16px 8px; display: flex; flex-direction: column; gap: 10px; }
+.cosme-none { padding: 14px 4px; font-size: 12px; color: var(--muted); }
+
+.cosme-card {
+  background: var(--white); border: 1.5px solid var(--border);
+  border-radius: var(--r); padding: 14px; box-shadow: var(--sh1);
+}
+.cosme-card-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.cosme-card-name { font-size: 15px; font-weight: 800; color: var(--ink); word-break: break-word; }
+.cosme-pill {
+  flex-shrink: 0; font-size: 11px; font-weight: 700; color: var(--g700);
+  background: var(--g100); border-radius: 20px; padding: 3px 9px;
+}
+.cosme-card-meta { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.cosme-card-meta b { color: var(--ink2); }
+.cosme-bar { height: 8px; background: var(--g100); border-radius: 4px; overflow: hidden; margin-top: 10px; }
+.cosme-bar-fill { height: 100%; background: var(--g500); border-radius: 4px; }
+.cosme-bar-fill.over { background: var(--amber); }
+.cosme-card-msg { font-size: 13px; font-weight: 700; color: var(--g700); margin-top: 8px; }
+.cosme-card-msg.over { color: var(--amber); }
+.cosme-card-src { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.cosme-card-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+.cosme-btn {
+  min-height: 40px; padding: 8px 16px; border-radius: var(--r-sm);
+  background: var(--g100); color: var(--g800); border: 1.5px solid var(--border2);
+  font-size: 13px; font-weight: 700; cursor: pointer; font-family: var(--font);
+  -webkit-tap-highlight-color: transparent;
+}
+.cosme-btn-main { flex: 1; background: var(--g500); border-color: var(--g500); color: var(--white); }
+.cosme-btn-sm { min-height: 34px; padding: 6px 10px; font-size: 12px; flex-shrink: 0; }
+.cosme-btn:active { opacity: .85; }
+
+.cosme-hist {
+  display: flex; align-items: center; gap: 10px; cursor: pointer;
+  background: var(--white); border: 1px solid var(--border); border-radius: var(--r-sm);
+  padding: 10px 12px;
+}
+.cosme-hist-main { flex: 1; min-width: 0; }
+.cosme-hist-name { font-size: 14px; font-weight: 700; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cosme-hist-meta { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.cosme-hist-months { text-align: right; font-size: 12px; color: var(--ink2); flex-shrink: 0; line-height: 1.2; }
+.cosme-hist-months b { font-size: 18px; color: var(--g700); }
+.cosme-hist-months small { display: block; font-size: 10px; color: var(--muted); }
+
+/* 登録モーダル */
+.cosme-name-group { position: relative; }
+.cosme-suggest {
+  position: absolute; left: 0; right: 0; z-index: 20; margin-top: 4px;
+  background: var(--white); border: 1.5px solid var(--border2);
+  border-radius: var(--r-sm); box-shadow: var(--sh2);
+  max-height: 260px; overflow-y: auto;
+}
+.cosme-suggest-item {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 1px;
+  width: 100%; padding: 10px 12px; text-align: left;
+  background: none; border: none; border-bottom: 1px solid var(--g100);
+  cursor: pointer; font-family: var(--font);
+}
+.cosme-suggest-item:last-child { border-bottom: none; }
+.cosme-suggest-item:hover, .cosme-suggest-item:focus-visible { background: var(--g50); outline: none; }
+.cosme-suggest-name { font-size: 14px; font-weight: 700; color: var(--ink); }
+.cosme-suggest-sub  { font-size: 11px; color: var(--muted); }
+.cosme-hint { font-size: 11px; color: var(--muted); margin-top: 6px; line-height: 1.6; }
+.cosme-date-row { display: flex; gap: 8px; align-items: center; }
+.cosme-date-row .form-input { flex: 1; min-width: 0; }
+
+@media (min-width: 768px) {
+  #cosme-body { max-width: 760px; }
+  .cosme-summary { margin: 20px 32px 4px; }
+  .cosme-list { padding: 4px 32px 8px; }
+}
