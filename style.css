@@ -2610,3 +2610,40 @@ body:has(#modal-task:not(.hidden)) .chara-float { display: none; }
   .cosme-summary { margin: 20px 32px 4px; }
   .cosme-list { padding: 4px 32px 8px; }
 }
+
+/* ----------------------------------------------------------------
+   コスメ画面・登録モーダルだけ、やさしい紫のテーマにする
+   （共通パーツが参照する緑の変数を、この範囲だけ紫に差し替える）
+   ---------------------------------------------------------------- */
+#screen-cosme, #modal-cosme {
+  --g900: #3b2f5c;
+  --g800: #4a3b73;
+  --g700: #65508f;
+  --g600: #7a62ad;
+  --g500: #8b72be;
+  --g400: #a995d3;
+  --g300: #cdc2e6;
+  --g200: #e4def2;
+  --g100: #f0ecf8;
+  --g50:  #f8f6fc;
+  --border:  #e2dbf0;
+  --border2: #cfc5e6;
+  --muted:   #8d84a3;
+  --ink2:    #4d4563;
+  --sh1: 0 1px 4px rgba(90,70,140,.08);
+  --sh2: 0 4px 16px rgba(90,70,140,.12);
+}
+#screen-cosme { background: var(--g50); }
+#screen-cosme .topbar-btn      { box-shadow: 0 2px 8px rgba(139,114,190,.35); }
+#modal-cosme .btn-primary      { box-shadow: 0 4px 14px rgba(139,114,190,.35); }
+#modal-cosme .form-input:focus,
+#modal-cosme .form-select:focus,
+#modal-cosme .form-textarea:focus { box-shadow: 0 0 0 3px rgba(139,114,190,.18); }
+#screen-cosme .empty-state .btn-primary { box-shadow: 0 4px 14px rgba(139,114,190,.35); }
+
+/* コスメタブ選択中のナビ色（スマホの下部ナビのみ。PCのサイドバーは既存の配色のまま） */
+@media (max-width: 767px) {
+  .nav-item[data-screen="cosme"].active { color: #8b72be; }
+  .nav-item[data-screen="cosme"].active .nav-dot { background: #8b72be; }
+}
+#modal-cosme { background: rgba(58,44,92,.45); }
