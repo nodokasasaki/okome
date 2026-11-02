@@ -3146,7 +3146,7 @@ onAuthReady(async user => {
   function setIndicator(dist) {
     const pct   = Math.min(dist / THRESHOLD, 1);
     const ready = dist >= THRESHOLD;
-    indicator.style.transform  = `translateY(${Math.min(dist * 0.5, 36)}px)`;
+    indicator.style.transform  = `translateX(-50%) translateY(${Math.min(dist * 0.5, 36)}px)`;
     indicator.style.opacity    = String(Math.min(pct * 1.6, 1));
     indicator.style.display    = dist > 8 ? 'flex' : 'none';
     document.getElementById('ptr-label').textContent = ready ? '離して更新！' : '引っ張って更新';
@@ -3156,7 +3156,7 @@ onAuthReady(async user => {
 
   function hideIndicator() {
     indicator.style.opacity   = '0';
-    indicator.style.transform = 'translateY(0)';
+    indicator.style.transform = 'translateX(-50%) translateY(0)';
     setTimeout(() => { indicator.style.display = 'none'; }, 200);
   }
 
