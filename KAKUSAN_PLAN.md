@@ -31,7 +31,7 @@
 | ② | OGP・SNSシェア設定 | 🔴 最高 | 手動（一度だけ設定） | ✅ 完了 |
 | ③ | SNSアカウント開設・AI自動投稿（Bluesky） | 🔴 最高 | ★★★ 全自動 | ✅ 完了 |
 | ④ | SEO対策（sitemap.xml / robots.txt） | 🟡 中 | ★★ 半自動 | ✅ 完了 |
-| ⑤ | プレスリリース・告知記事（note / PR Times等） | 🟡 中 | 手動 | ⬜ 未着手 |
+| ⑤ | プレスリリース・告知記事（note / PR Times等） | 🟡 中 | 手動 | 🔧 原稿作成済み（投稿待ち） |
 | ⑥ | リファラル機能（友達招待） | 🟢 低 | ★★ 半自動 | ✅ 完了 |
 
 ---
@@ -252,8 +252,8 @@ Sitemap: https://kakusan-25200.web.app/sitemap.xml
 「家事の予定表がかんたんに作れるウェブアプリ「おうちリズム」を公開しました」
 
 ### 着手タスク
-- [ ] LP完成後に記事を執筆
-- [ ] PR Times または note に投稿
+- [x] 告知記事・プレスリリース原稿を作成（[`PROMOTION_DRAFT.md`](./PROMOTION_DRAFT.md)）
+- [ ] note / はてなブログ / PR Times などへ投稿
 
 ---
 
@@ -283,7 +283,7 @@ Week 1-2:   ① LPページ構築                          ✅ 完了
 Week 2:     ② OGP設定（LP完成と同時）                ✅ 完了
 Week 3:     ③ Bluesky アカウント開設 + AI自動投稿      ✅ 完了
 Week 3-4:   ④ SEO（robots.txt / sitemap.xml / GSC）  ✅ 完了
-Month 2:    ⑤ プレスリリース・note記事投稿             ⬜ 未着手
+Month 2:    ⑤ プレスリリース・note記事投稿             🔧 原稿作成済み（投稿待ち）
 Month 3:    ⑥ リファラル機能実装                      ✅ 完了
 ```
 
