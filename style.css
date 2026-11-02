@@ -2519,6 +2519,124 @@ body:has(#modal-task:not(.hidden)) .chara-float { display: none; }
 }
 
 /* ================================================================
+   友達招待・リファラル（設定画面）
+   ================================================================ */
+.setting-referral-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: var(--r-sm);
+  padding: 14px 16px;
+  margin: 8px 18px 14px;
+}
+.referral-card-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.referral-card-icon {
+  font-size: 24px;
+  line-height: 1;
+}
+.referral-card-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--g800);
+  margin-bottom: 2px;
+}
+.referral-card-sub {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+}
+.referral-anon-hint {
+  background: var(--g50);
+  border: 1px dashed var(--g300);
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+.referral-login-btn {
+  display: block;
+  margin-top: 8px;
+  padding: 6px 14px;
+  background: var(--g500);
+  color: #fff;
+  border: none;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+}
+.referral-stats-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: var(--g50);
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+.referral-stat-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.referral-stat-count {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--g700);
+}
+.referral-btn-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+@media (max-width: 480px) {
+  .referral-btn-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.share-btn-bsky {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 6px;
+  background: #0085ff;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity .15s;
+}
+.share-btn-bsky:active { opacity: .85; }
+.share-btn-x {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 10px 6px;
+  background: #000;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: var(--font);
+  transition: opacity .15s;
+}
+.share-btn-x:active { opacity: .85; }
+
+/* ================================================================
    コスメ（消費リズム）
    ================================================================ */
 .cosme-summary {

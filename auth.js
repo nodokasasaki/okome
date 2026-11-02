@@ -492,6 +492,8 @@ function updateAuthUI(user) {
       <button class="btn-secondary" id="btn-signout" style="margin:0;padding:8px 16px;font-size:13px;white-space:nowrap;flex-shrink:0;">ログアウト</button>
     </div>`;
   document.getElementById('btn-signout')?.addEventListener('click', signOut);
+
+  if (typeof renderReferralSection === 'function') renderReferralSection();
 }
 
 // ----------------------------------------------------------------

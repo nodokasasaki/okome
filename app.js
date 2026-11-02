@@ -106,11 +106,12 @@ const _cache = {
   or2_dismissed_suggest: [],
   or2_title_shown:       [],
   or2_tutorial_cleared:  false,
+  or2_referral_info:     null,
 };
 
 const DB = {
   // period_days: { date:'2024-01-01', flow:'normal'|'light'|'heavy'|'none', symptoms:[], memo:'' }
-  K: { tasks: 'or2_tasks', logs: 'or2_logs', period_days: 'or2_period_days', settings: 'or2_settings', partner: 'or2_partner', unlocked: 'or2_unlocked', dismissed_suggest: 'or2_dismissed_suggest', title_shown: 'or2_title_shown', tutorial_cleared: 'or2_tutorial_cleared', cosmetics: 'or2_cosmetics' },
+  K: { tasks: 'or2_tasks', logs: 'or2_logs', period_days: 'or2_period_days', settings: 'or2_settings', partner: 'or2_partner', unlocked: 'or2_unlocked', dismissed_suggest: 'or2_dismissed_suggest', title_shown: 'or2_title_shown', tutorial_cleared: 'or2_tutorial_cleared', cosmetics: 'or2_cosmetics', referral_info: 'or2_referral_info' },
   get(k)       { const v = _cache[k]; return Array.isArray(v) ? v : (v ?? []); },
   getObj(k, d) { const v = _cache[k]; return v !== null && v !== undefined ? v : d; },
   set(k, v)    { _cache[k] = v; },
@@ -442,6 +443,19 @@ function checkShareURLOnLoad() {
 
   if (roomId) {
     onAuthReady(async user => {
+      // プライバシー同意がまだの場合は、同意されるまでログイン画面表示を一時保留する
+      if (localStorage.getItem('or2_privacy_agreed') !== '1') {
+        const agreeBtn = document.getElementById('btn-privacy-agree');
+        if (agreeBtn) {
+          const handleAgreeAndLoad = () => {
+            agreeBtn.removeEventListener('click', handleAgreeAndLoad);
+            checkShareURLOnLoad(); // 同意完了後に再実行
+          };
+          agreeBtn.addEventListener('click', handleAgreeAndLoad);
+        }
+        return;
+      }
+
       // 未ログイン または 匿名ユーザーの場合はアカウント登録を必須にする
       // （生理記録という要配慮個人情報を共有するため匿名不可）
       if (!user || isAnonymous()) {
@@ -1056,10 +1070,13 @@ function calcTotalScore() {
   const logs  = DB.get(DB.K.logs);
   const tasks = DB.get(DB.K.tasks);
   const taskMap = Object.fromEntries(tasks.map(t => [t.id, t]));
-  return logs.reduce((sum, l) => {
+  const logScore = logs.reduce((sum, l) => {
     const t = taskMap[l.taskId];
     return sum + estimateTaskScore(t);
   }, 0);
+  const refInfo = DB.getObj(DB.K.referral_info, {});
+  const refBonus = (refInfo?.referral_bonus || 0) + (refInfo?.invited_bonus || 0);
+  return logScore + refBonus;
 }
 
 // 称号テーブル（スコア閾値順）
@@ -1671,6 +1688,112 @@ function renderSettings() {
   if (anonWarning) {
     anonWarning.style.display = (FIREBASE_CONFIGURED && !isLoggedIn?.()) ? '' : 'none';
   }
+
+  // 友達招待セクションの描画
+  renderReferralSection();
+}
+
+// ----------------------------------------------------------------
+// 9a. 友達招待（リファラル）UI & ロジック
+// ----------------------------------------------------------------
+function buildReferralURL(userId) {
+  return `https://kakusan-25200.web.app/?ref=${encodeURIComponent(userId || '')}`;
+}
+
+function renderReferralSection() {
+  const loggedIn = typeof isLoggedIn === 'function' && isLoggedIn();
+  const anonHint = document.getElementById('referral-anon-hint');
+  const authArea = document.getElementById('referral-auth-area');
+  if (!anonHint || !authArea) return;
+
+  if (loggedIn) {
+    anonHint.style.display = 'none';
+    authArea.style.display = '';
+
+    const uid = typeof getUserId === 'function' ? getUserId() : '';
+    const refUrl = buildReferralURL(uid);
+    const urlBox = document.getElementById('referral-link-url');
+    if (urlBox) urlBox.textContent = refUrl;
+
+    const refInfo = DB.getObj(DB.K.referral_info, {});
+    const count = refInfo?.referral_count || 0;
+    const countEl = document.getElementById('referral-stat-count');
+    if (countEl) countEl.textContent = `${count} 人（+${(refInfo?.referral_bonus || 0)}pt）`;
+  } else {
+    anonHint.style.display = '';
+    authArea.style.display = 'none';
+  }
+}
+
+// 招待URL（?ref=UID）の自動チェック
+function checkReferralURLOnLoad() {
+  try {
+    const params = new URLSearchParams(location.search);
+    const refUid = params.get('ref');
+    if (refUid) {
+      sessionStorage.setItem('pending_referral_uid', refUid);
+      params.delete('ref');
+      const newQuery = params.toString() ? `?${params.toString()}` : '';
+      history.replaceState(null, '', location.pathname + newQuery);
+    }
+  } catch (_) {}
+
+  // ログイン成功時に招待のFirestore登録を実行
+  onAuthReady(async user => {
+    if (!user || user.isAnonymous) return;
+    const pendingInviter = sessionStorage.getItem('pending_referral_uid');
+    if (pendingInviter && pendingInviter !== user.uid) {
+      const recorded = await recordReferral(pendingInviter, user.uid);
+      sessionStorage.removeItem('pending_referral_uid');
+      if (recorded) {
+        showToast('友達からの招待特典（+15pt）を獲得しました！🎉');
+        renderCalendar();
+        renderTaskList();
+        renderSettings();
+        checkAndShowNewTitle();
+      }
+    }
+  });
+}
+
+function bindReferralEvents() {
+  // 未ログイン時のログインボタン
+  document.getElementById('btn-referral-login')?.addEventListener('click', () => {
+    openAuthModal('register');
+  });
+
+  // URLコピー
+  document.getElementById('btn-ref-copy')?.addEventListener('click', () => {
+    const url = document.getElementById('referral-link-url')?.textContent || '';
+    if (!url) return;
+    navigator.clipboard?.writeText(url)
+      .then(() => showToast('招待リンクをコピーしました！'))
+      .catch(() => showToast('コピーに失敗しました'));
+  });
+
+  // LINE
+  document.getElementById('btn-ref-line')?.addEventListener('click', () => {
+    const url = document.getElementById('referral-link-url')?.textContent || '';
+    if (!url) return;
+    const text = '家事スケジュールをかんたん管理できる「おうちリズム」を使ってみて！\n招待リンクから始めると特典ボーナスがもらえます🎁\n' + url;
+    window.open(`https://line.me/R/msg/text/?${encodeURIComponent(text)}`, '_blank');
+  });
+
+  // Bluesky
+  document.getElementById('btn-ref-bsky')?.addEventListener('click', () => {
+    const url = document.getElementById('referral-link-url')?.textContent || '';
+    if (!url) return;
+    const text = '家事スケジュール管理アプリ「おうちリズム」をはじめました！一緒におうちリズムをつくろう🏠✨ #家事 #おうちリズム\n' + url;
+    window.open(`https://bsky.app/intent/compose?text=${encodeURIComponent(text)}`, '_blank');
+  });
+
+  // X
+  document.getElementById('btn-ref-x')?.addEventListener('click', () => {
+    const url = document.getElementById('referral-link-url')?.textContent || '';
+    if (!url) return;
+    const text = '家事スケジュール管理アプリ「おうちリズム」をはじめました！一緒におうちリズムをつくろう🏠✨\n' + url + '\n#おうちリズム #家事';
+    window.open(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`, '_blank');
+  });
 }
 
 function saveSettings() {
@@ -2547,6 +2670,7 @@ function bindEvents() {
     _cache[DB.K.dismissed_suggest] = [];
     _cache[DB.K.title_shown]       = [];
     _cache[DB.K.tutorial_cleared]  = false;
+    _cache[DB.K.referral_info]     = null;
     // ログイン済みの場合は Firestore のデータも削除
     if (isLoggedIn?.()) {
       const uid = getUserId?.();
@@ -2554,7 +2678,7 @@ function bindEvents() {
         try {
           await Promise.all([
             _db.collection('users').doc(uid).set(
-              { settings: null, tutorial_cleared: false, unlocked: [], dismissed_suggest: [], title_shown: [] },
+              { settings: null, tutorial_cleared: false, unlocked: [], dismissed_suggest: [], title_shown: [], referral_info: null },
               { merge: false }
             ),
             ...['tasks','logs','period_days','cosmetics'].map(async col => {
@@ -2882,6 +3006,7 @@ if ('serviceWorker' in navigator) {
 bindEvents();
 bindUnlockEvents();
 bindAuthEvents();
+bindReferralEvents();
 
 // 匿名ユーザー登録促進バナーのボタン
 document.getElementById('btn-anon-upgrade')?.addEventListener('click', () => {
@@ -2901,6 +3026,8 @@ window.addEventListener('resize', applyLayout);
 
 // 共有URL自動チェック（?share= があれば生理データを取り込む）
 checkShareURLOnLoad();
+// 友達招待URL自動チェック（?ref= があれば招待特典を処理）
+checkReferralURLOnLoad();
 
 switchScreen('calendar');
 
@@ -2924,13 +3051,46 @@ onAuthReady(async user => {
   } catch (e) {
     console.warn('[Splash] 初期化中にエラー:', e);
   }
+
+  // プライバシーポリシー同意がまだの場合は、同意ボタンを押すまでオンボーディング判定を遅延する
+  if (localStorage.getItem('or2_privacy_agreed') !== '1') {
+    const agreeBtn = document.getElementById('btn-privacy-agree');
+    if (agreeBtn) {
+      const handleAgree = () => {
+        agreeBtn.removeEventListener('click', handleAgree);
+        // 同意が完了したので、初期起動UIの表示判定へ進む
+        handleFirstLaunchUI();
+      };
+      agreeBtn.addEventListener('click', handleAgree);
+    }
+    return;
+  }
+
+  handleFirstLaunchUI();
+});
+
+// プライバシー同意完了後の初期起動UI表示判定
+function handleFirstLaunchUI() {
+  // 招待処理（ログインが必要）が裏で走っている場合は、オンボーディング表示を保留してスプラッシュを表示
+  let hasPendingInvite = false;
+  try {
+    const params = new URLSearchParams(location.search);
+    hasPendingInvite = !!sessionStorage.getItem('pending_invite_room') || params.has('room');
+  } catch (_) {}
+
+  if (hasPendingInvite) {
+    // 招待による登録・ログイン画面が最前面に出るため、オンボーディングは保留する
+    showSplash();
+    return;
+  }
+
   // 住まい・掃除レベルが未設定（初回起動）ならセットアップを表示、それ以外はスプラッシュ
   if (DB.getObj(DB.K.settings, null) === null) {
     document.getElementById('modal-onboarding').classList.remove('hidden');
   } else {
     showSplash();
   }
-});
+}
 
 // ----------------------------------------------------------------
 // フローティングキャラクター（かくさん）

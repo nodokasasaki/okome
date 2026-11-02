@@ -80,6 +80,7 @@ async function downloadCloudDataToCache(uid) {
       if (meta.unlocked          != null) _cache[DB.K.unlocked]          = meta.unlocked;
       if (meta.dismissed_suggest != null) _cache[DB.K.dismissed_suggest] = meta.dismissed_suggest;
       if (meta.title_shown       != null) _cache[DB.K.title_shown]       = meta.title_shown;
+      if (meta.referral_info     != null) _cache[DB.K.referral_info]     = meta.referral_info;
     }
 
     // tasks（空でも必ず上書きして古いキャッシュを排除）
@@ -278,6 +279,7 @@ function _metaField(k) {
     [DB.K.unlocked]:          'unlocked',
     [DB.K.dismissed_suggest]: 'dismissed_suggest',
     [DB.K.title_shown]:       'title_shown',
+    [DB.K.referral_info]:     'referral_info',
   };
   return map[k] || k;
 }
@@ -303,6 +305,7 @@ async function _doUserSignedIn(uid) {
   try {
     const ok = await downloadCloudDataToCache(uid);
     if (ok) {
+      await syncMyReferralCount(uid);
       showToast('データを読み込みました');
       syncReady = true;
     } else {
@@ -444,6 +447,16 @@ function startShareRoomSync(roomId, onRoomUpdate, onPartnerPeriodUpdate) {
     const room = snap.data();
     const uid = getUserId?.();
     const partnerUid = room.ownerUid === uid ? room.partnerUid : room.ownerUid;
+
+    // 自身のユーザーメタデータに roomId と partnerUid を自動同期（セキュリティルールでのペア確認用）
+    if (uid) {
+      _userDoc(uid).set({
+        roomId: roomId,
+        partnerUid: partnerUid || null,
+        updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+      }, { merge: true }).catch(err => console.warn('[Share] ユーザーメタデータ更新失敗:', err));
+    }
+
     if (partnerUid && !_partnerPeriodUnsub) {
       _partnerPeriodUnsub = _db.collection('users').doc(partnerUid)
         .collection('period_days')
@@ -527,4 +540,64 @@ function listenPartnerNotifications(roomId, onNotify) {
         if (change.type === 'added') onNotify?.(change.doc.data());
       });
     }, err => console.warn('[Share] notifications:', err));
+}
+
+// ----------------------------------------------------------------
+// リファラル（友達招待）処理
+// ----------------------------------------------------------------
+async function recordReferral(inviterUid, invitedUid) {
+  if (!_db || !inviterUid || !invitedUid || inviterUid === invitedUid) return false;
+  try {
+    const refDoc = _db.collection('referrals').doc(invitedUid);
+    const existing = await refDoc.get();
+    if (existing.exists) return false; // すでに招待経由で記録済み
+
+    // referrals コレクションに記録（invitedUid をドキュメントIDとする）
+    await refDoc.set({
+      inviterUid,
+      invitedUid,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+    });
+
+    // 招待された側（自分）のボーナス（+15pt）を自分のドキュメントに記録
+    const curRef = DB.getObj(DB.K.referral_info, {});
+    const myRefInfo = {
+      ...curRef,
+      invited_by: inviterUid,
+      invited_bonus: 15,
+    };
+    await _userDoc(invitedUid).set({
+      referral_info: myRefInfo,
+    }, { merge: true });
+
+    // ローカルキャッシュも更新
+    DB.set(DB.K.referral_info, myRefInfo);
+
+    console.log(`[Referral] 招待を記録しました: inviter=${inviterUid}, invited=${invitedUid}`);
+    return true;
+  } catch (e) {
+    console.warn('[Referral] 招待記録に失敗:', e);
+    return false;
+  }
+}
+
+// 自分が招待した人数を集計して更新する
+async function syncMyReferralCount(uid) {
+  if (!_db || !uid) return;
+  try {
+    const snap = await _db.collection('referrals').where('inviterUid', '==', uid).get();
+    const count = snap.size;
+    const bonus = count * 30;
+
+    const curRef = DB.getObj(DB.K.referral_info, {});
+    const updated = {
+      ...curRef,
+      referral_count: count,
+      referral_bonus: bonus,
+    };
+    DB.set(DB.K.referral_info, updated);
+    await _userDoc(uid).set({ referral_info: updated }, { merge: true });
+  } catch (e) {
+    console.warn('[Referral] 招待数同期失敗:', e);
+  }
 }

@@ -673,6 +673,20 @@
   var m = today.getMonth(); // 0-indexed
   var todayDate = today.getDate();
 
+  // 招待リファラルパラメータ（?ref=UID）があればアプリ遷移リンクに引き継ぐ
+  var urlParams = new URLSearchParams(window.location.search);
+  var refParam = urlParams.get('ref');
+  if (refParam) {
+    var ctaLinks = document.querySelectorAll('a[href^="https://kakusan-25200.web.app/"], a[href="/"]');
+    ctaLinks.forEach(function (link) {
+      try {
+        var u = new URL(link.href, window.location.origin);
+        u.searchParams.set('ref', refParam);
+        link.href = u.toString();
+      } catch (_) {}
+    });
+  }
+
   // ラベル
   document.getElementById('mock-month-label').textContent = y + '年' + (m + 1) + '月';
 

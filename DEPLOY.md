@@ -76,6 +76,17 @@ service cloud.firestore {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
 
+    // パートナーの生理データのみ読み取りを許可する
+    match /users/{userId}/period_days/{docId} {
+      allow read: if request.auth != null && (
+        request.auth.uid == userId ||
+        (
+          exists(/databases/$(database)/documents/users/$(userId)) &&
+          get(/databases/$(database)/documents/users/$(userId)).data.partnerUid == request.auth.uid
+        )
+      );
+    }
+
     // パートナー共有ルーム
     match /share_rooms/{roomId} {
       // 作成：ログイン済み（匿名ユーザー不可）
@@ -102,6 +113,17 @@ service cloud.firestore {
           get(/databases/$(database)/documents/share_rooms/$(roomId)).data.partnerUid == request.auth.uid
         );
       }
+    }
+
+    // 友達招待（リファラル）
+    match /referrals/{invitedUid} {
+      // 作成：ログイン済みの被招待者本人（invitedUid == request.auth.uid）
+      allow create: if request.auth != null && request.auth.uid == invitedUid;
+      // 読み取り：招待主または招待された本人
+      allow read: if request.auth != null && (
+        resource.data.inviterUid == request.auth.uid ||
+        resource.data.invitedUid == request.auth.uid
+      );
     }
 
   }

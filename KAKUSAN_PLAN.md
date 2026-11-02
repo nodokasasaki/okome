@@ -30,9 +30,9 @@
 | ① | ランディングページ（LP）構築 | 🔴 最高 | 手動（一度だけ作成） | ✅ 完了 |
 | ② | OGP・SNSシェア設定 | 🔴 最高 | 手動（一度だけ設定） | ✅ 完了 |
 | ③ | SNSアカウント開設・AI自動投稿（Bluesky） | 🔴 最高 | ★★★ 全自動 | ✅ 完了 |
-| ④ | SEO対策（sitemap.xml / robots.txt） | 🟡 中 | ★★ 半自動 | 🔧 ファイル作成済み・GSC登録待ち |
+| ④ | SEO対策（sitemap.xml / robots.txt） | 🟡 中 | ★★ 半自動 | ✅ 完了 |
 | ⑤ | プレスリリース・告知記事（note / PR Times等） | 🟡 中 | 手動 | ⬜ 未着手 |
-| ⑥ | リファラル機能（友達招待） | 🟢 低 | ★★ 半自動 | ⬜ 未着手 |
+| ⑥ | リファラル機能（友達招待） | 🟢 低 | ★★ 半自動 | ✅ 完了 |
 
 ---
 
@@ -237,7 +237,7 @@ Sitemap: https://kakusan-25200.web.app/sitemap.xml
 ### 着手タスク
 - [x] `robots.txt` を作成
 - [x] `sitemap.xml` を作成
-- [ ] Google Search Console にサイト登録・sitemap送信（デプロイ後）
+- [x] Google Search Console にサイト登録・sitemap送信（デプロイ後）
 
 ---
 
@@ -268,9 +268,11 @@ Sitemap: https://kakusan-25200.web.app/sitemap.xml
 - 招待した人・された人に称号を付与
 
 ### 着手タスク
-- [ ] 招待URL生成ロジックを実装
-- [ ] Firestore `referrals` コレクション設計
-- [ ] 称号付与ロジックを既存バッジ機能と統合
+- [x] 招待URL生成ロジック（`?ref=UID` / LP引き継ぎ対応）を実装
+- [x] 設定画面への友達招待・シェアUI（URLコピー / LINE / Bluesky / X）を実装
+- [x] Firestore `referrals` コレクション設計＆記録・集計ロジックを実装
+- [x] 称号・スコアボーナス（招待側 +30pt / 被招待側 +15pt）付与ロジックを統合
+- [x] Firestore セキュリティルールの定義（DEPLOY.md）
 
 ---
 
@@ -279,10 +281,10 @@ Sitemap: https://kakusan-25200.web.app/sitemap.xml
 ```
 Week 1-2:   ① LPページ構築                          ✅ 完了
 Week 2:     ② OGP設定（LP完成と同時）                ✅ 完了
-Week 3:     ③ Bluesky アカウント開設 + AI自動投稿      🔧 進行中
-Week 3-4:   ④ SEO（robots.txt / sitemap.xml / GSC）  🔧 ファイル作成済み
+Week 3:     ③ Bluesky アカウント開設 + AI自動投稿      ✅ 完了
+Week 3-4:   ④ SEO（robots.txt / sitemap.xml / GSC）  ✅ 完了
 Month 2:    ⑤ プレスリリース・note記事投稿             ⬜ 未着手
-Month 3:    ⑥ リファラル機能実装                      ⬜ 未着手
+Month 3:    ⑥ リファラル機能実装                      ✅ 完了
 ```
 
 ---

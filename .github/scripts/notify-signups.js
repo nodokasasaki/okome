@@ -1,10 +1,11 @@
 /**
- * おうちリズム — 新規登録者の Discord 通知スクリプト
+ * おうちリズム — 新規ユーザーの Discord 通知スクリプト
  *
  * 動作：
- *   1. Firebase Auth の全ユーザーから「匿名ではない」登録済みユーザーを抽出
+ *   1. Firebase Auth の全ユーザーを「登録済み（non-anon）」と「匿名」に分類
  *   2. Firestore `_system/signupNotifier` に保存済みの「通知済みUID」と比較
  *   3. 未通知ユーザーがいれば Discord Webhook へ通知（メールアドレス等の個人情報は送らない）
+ *      - 登録済みユーザーと匿名ユーザーをタグで分けて表示
  *   4. 通知に成功した場合のみ、通知済みUIDを更新（失敗時は次回再送）
  *
  * 初回実行時は既存ユーザーを通知済みとして記録するだけで、通知は送りません。
@@ -46,31 +47,50 @@ function formatJst(iso) {
   });
 }
 
-async function listRegisteredUsers(auth) {
-  const users = [];
+async function listAllUsers(auth) {
+  const registered = []; // providerData あり（非匿名）
+  const anonymous = [];  // providerData なし（匿名）
   let pageToken;
   do {
     const res = await auth.listUsers(1000, pageToken);
     for (const u of res.users) {
-      // 匿名ユーザー（providerData が空）は対象外
-      if (u.providerData.length > 0) users.push(u);
+      if (u.providerData.length > 0) {
+        registered.push(u);
+      } else {
+        anonymous.push(u);
+      }
     }
     pageToken = res.pageToken;
   } while (pageToken);
-  return users;
+  return { registered, anonymous };
 }
 
-function buildMessage(newUsers, total) {
-  const header = `🎉 おうちリズムに新規登録がありました（${newUsers.length}件 / 累計 ${total}人）`;
-  const lines = newUsers.map(
-    (u) => `・${providerLabel(u)}　${formatJst(u.metadata.creationTime)}`
-  );
-  let body = lines.join('\n');
-  const room = DISCORD_MAX_LEN - header.length - 1;
-  if (body.length > room) {
-    body = body.slice(0, room - 10) + '\n…ほか多数';
+function buildMessage(newRegistered, newAnonymous, totalRegistered, totalAnonymous) {
+  const sections = [];
+
+  if (newRegistered.length > 0) {
+    const header = `👤 [登録ユーザー] 新規 ${newRegistered.length}件 / 累計 ${totalRegistered}人`;
+    const lines = newRegistered
+      .sort((a, b) => new Date(a.metadata.creationTime) - new Date(b.metadata.creationTime))
+      .map((u) => `・${providerLabel(u)}　${formatJst(u.metadata.creationTime)}`);
+    let body = lines.join('\n');
+    const room = DISCORD_MAX_LEN / 2 - header.length - 1;
+    if (body.length > room) body = body.slice(0, room - 10) + '\n…ほか多数';
+    sections.push(`${header}\n${body}`);
   }
-  return `${header}\n${body}`;
+
+  if (newAnonymous.length > 0) {
+    const header = `👻 [匿名ユーザー] 新規 ${newAnonymous.length}件 / 累計 ${totalAnonymous}人`;
+    const lines = newAnonymous
+      .sort((a, b) => new Date(a.metadata.creationTime) - new Date(b.metadata.creationTime))
+      .map((u) => `・匿名　${formatJst(u.metadata.creationTime)}`);
+    let body = lines.join('\n');
+    const room = DISCORD_MAX_LEN / 2 - header.length - 1;
+    if (body.length > room) body = body.slice(0, room - 10) + '\n…ほか多数';
+    sections.push(`${header}\n${body}`);
+  }
+
+  return sections.join('\n\n');
 }
 
 async function sendDiscord(webhookUrl, content) {
@@ -102,41 +122,51 @@ async function main() {
   const auth = getAuth();
   const stateRef = getFirestore().collection(STATE_COLLECTION).doc(STATE_DOC);
 
-  const registered = await listRegisteredUsers(auth);
+  const { registered, anonymous } = await listAllUsers(auth);
+  const allUsers = [...registered, ...anonymous];
   const snap = await stateRef.get();
 
   // 初回：ベースライン記録のみ（既存ユーザー分の大量通知を防ぐ）
   if (!snap.exists) {
     await stateRef.set({
-      notifiedUids: registered.map((u) => u.uid),
+      notifiedUids: allUsers.map((u) => u.uid),
       updatedAt: FieldValue.serverTimestamp(),
     });
-    console.info(JSON.stringify({ level: 'INFO', msg: 'baseline created', count: registered.length }));
+    console.info(JSON.stringify({
+      level: 'INFO',
+      msg: 'baseline created',
+      registered: registered.length,
+      anonymous: anonymous.length,
+    }));
     return;
   }
 
   const notified = new Set(snap.data().notifiedUids || []);
-  const newUsers = registered
-    .filter((u) => !notified.has(u.uid))
-    .sort((a, b) => new Date(a.metadata.creationTime) - new Date(b.metadata.creationTime));
+  const newRegistered = registered.filter((u) => !notified.has(u.uid));
+  const newAnonymous = anonymous.filter((u) => !notified.has(u.uid));
 
-  if (newUsers.length === 0) {
+  if (newRegistered.length === 0 && newAnonymous.length === 0) {
     console.info(JSON.stringify({ level: 'INFO', msg: 'no new signups' }));
     return;
   }
 
-  await sendDiscord(webhookUrl, buildMessage(newUsers, registered.length));
+  const message = buildMessage(newRegistered, newAnonymous, registered.length, anonymous.length);
+  await sendDiscord(webhookUrl, message);
 
   // 通知成功後に状態を更新（削除済みユーザーは自然に除外される）
   await stateRef.set({
-    notifiedUids: registered.map((u) => u.uid),
+    notifiedUids: allUsers.map((u) => u.uid),
     updatedAt: FieldValue.serverTimestamp(),
   });
-  console.info(JSON.stringify({ level: 'INFO', msg: 'notified', count: newUsers.length }));
+  console.info(JSON.stringify({
+    level: 'INFO',
+    msg: 'notified',
+    newRegistered: newRegistered.length,
+    newAnonymous: newAnonymous.length,
+  }));
 }
 
 main().catch((err) => {
-  // 詳細はジョブログのみ。シークレットを含みうる値は出力しない
   console.error(JSON.stringify({ level: 'ERROR', msg: err.message }));
   process.exit(1);
 });
