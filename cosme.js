@@ -68,6 +68,52 @@ function cosmePredict(item, finished) {
 }
 
 // ----------------------------------------------------------------
+// Tips（日替わり。「次のTips」で切り替え、「一覧を見る」で全件表示）
+// ----------------------------------------------------------------
+let _cosmeTipOffset = 0;     // 「次のTips」を押した回数（画面を開き直すと日替わりに戻る）
+let _cosmeTipsOpen  = false; // 一覧の開閉
+
+function _cosmeCurrentTip(active) {
+  const cats = [...new Set(active.map(i => i.category))];
+  const pool = cats.length && COSME_TIPS.some(t => t.cat && cats.includes(t.cat))
+    ? COSME_TIPS.filter(t => t.cat && cats.includes(t.cat))
+    : COSME_TIPS;
+  const base = pool.indexOf(cosmePickTip(cats, D.today()));
+  return pool[(base + _cosmeTipOffset) % pool.length];
+}
+
+function cosmeTipHtml(active) {
+  const esc = s => _escapeHtml(String(s ?? ''));
+  const tip = _cosmeCurrentTip(active);
+  const list = _cosmeTipsOpen ? `
+    <div class="cosme-tips-list">
+      ${Object.entries(COSME_TIP_GROUPS).map(([g, label]) => `
+        <div class="cosme-tips-group">${esc(label)}</div>
+        ${COSME_TIPS.filter(t => t.group === g).map(t => `
+          <details class="cosme-tips-item">
+            <summary>${esc(t.title)}</summary>
+            <p>${esc(t.body)}</p>
+          </details>`).join('')}
+      `).join('')}
+    </div>` : '';
+  return `
+    <div class="cosme-tip">
+      <div class="cosme-tip-head">
+        <span class="cosme-tip-label">スキンケアTips</span>
+        <span class="cosme-tip-group">${esc(COSME_TIP_GROUPS[tip.group])}</span>
+      </div>
+      <div class="cosme-tip-title">${esc(tip.title)}</div>
+      <div class="cosme-tip-body">${esc(tip.body)}</div>
+      <div class="cosme-tip-actions">
+        <button class="cosme-btn cosme-btn-sm" data-act="tip-next">次のTips</button>
+        <button class="cosme-btn cosme-btn-sm" data-act="tip-list">${_cosmeTipsOpen ? '一覧を閉じる' : '一覧を見る'}</button>
+      </div>
+      ${list}
+      <div class="cosme-tip-note">一般的な情報です。肌に合わないときは使用を中止し、症状が続く場合は医療機関に相談してください。</div>
+    </div>`;
+}
+
+// ----------------------------------------------------------------
 // 描画
 // ----------------------------------------------------------------
 function renderCosme() {
@@ -75,7 +121,9 @@ function renderCosme() {
   if (!body) return;
 
   const items    = cosmeGetItems();
-  const active   = items.filter(i => !i.finishedAt).sort((a, b) => a.openedAt.localeCompare(b.openedAt));
+  // 使用中はスキンケアで使う順（同じカテゴリ内は使い始めた日の古い順）
+  const active   = items.filter(i => !i.finishedAt).sort((a, b) =>
+    cosmeCategoryRank(a.category) - cosmeCategoryRank(b.category) || a.openedAt.localeCompare(b.openedAt));
   const finished = items.filter(i => i.finishedAt).sort((a, b) => b.finishedAt.localeCompare(a.finishedAt));
   const esc = s => _escapeHtml(String(s ?? ''));
 
@@ -91,7 +139,8 @@ function renderCosme() {
         <div style="font-size:15px;font-weight:800;color:var(--g800);margin-bottom:6px;">コスメの消費リズムを記録しよう</div>
         <div style="font-size:12px;line-height:1.8;">使っている化粧品を登録して、使い切ったら記録。<br>何ヶ月で使い切るかが見えて、買い替えの目安になります。</div>
         <button class="btn-primary" style="max-width:260px;margin:18px auto 0;" id="btn-cosme-empty-add">最初のコスメを登録</button>
-      </div>`;
+      </div>
+      ${cosmeTipHtml([])}`;
     return;
   }
 
@@ -106,7 +155,7 @@ function renderCosme() {
       (byCat[f.category] = byCat[f.category] || []).push(d);
     });
     const chips = Object.entries(byCat)
-      .sort((a, b) => b[1].length - a[1].length)
+      .sort((a, b) => cosmeCategoryRank(a[0]) - cosmeCategoryRank(b[0]))
       .map(([cat, ds]) => `<span class="cosme-chip">${esc(COSME_CATEGORIES[cat]?.label || 'その他')} <b>${cosmeMonthsText(cosmeAvg(ds))}ヶ月</b><small>（${ds.length}回）</small></span>`)
       .join('');
     summaryHtml = `
@@ -162,7 +211,8 @@ function renderCosme() {
 
   body.innerHTML = `
     ${summaryHtml}
-    <div class="setting-section-header">使用中</div>
+    ${cosmeTipHtml(active)}
+    <div class="setting-section-header">使用中<span class="cosme-order-note">スキンケアで使う順</span></div>
     <div class="cosme-list">${activeHtml}</div>
     <div class="setting-section-header">使い切り履歴</div>
     <div class="cosme-list">${finishedHtml}</div>`;
@@ -329,6 +379,8 @@ function bindCosmeEvents() {
     if (!el) return;
     const id = el.dataset.id;
     const act = el.dataset.act;
+    if (act === 'tip-next') { _cosmeTipOffset++; renderCosme(); return; }
+    if (act === 'tip-list') { _cosmeTipsOpen = !_cosmeTipsOpen; renderCosme(); return; }
     if (act === 'finish') finishCosme(id);
     else if (act === 'edit') openCosmeModal(id);
     else if (act === 'again') {

@@ -5,13 +5,16 @@
    「自分の履歴」として候補に出る。
    ================================================================ */
 
+// 並び順 = スキンケアで使う順番（クレンジング → 洗顔 → 化粧水 → … → 日焼け止め → メイク）。
+// 使用中リスト・平均月数・登録画面のカテゴリ選択は、すべてこの定義順で並ぶ。
 // months: 使い切りまでの目安（月）。ユーザー自身の記録が無い場合の予測にだけ使う
 const COSME_CATEGORIES = {
   cleansing:  { label: 'クレンジング',   months: 3 },
   facewash:   { label: '洗顔料',         months: 3 },
   lotion:     { label: '化粧水',         months: 2 },
-  emulsion:   { label: '乳液',           months: 2 },
+  mask:       { label: 'パック・マスク', months: 1 },
   serum:      { label: '美容液',         months: 2 },
+  emulsion:   { label: '乳液',           months: 2 },
   cream:      { label: 'クリーム',       months: 3 },
   sunscreen:  { label: '日焼け止め',     months: 3 },
   base:       { label: '化粧下地',       months: 3 },
@@ -20,11 +23,17 @@ const COSME_CATEGORIES = {
   mascara:    { label: 'マスカラ',       months: 3 },
   eyeliner:   { label: 'アイライナー',   months: 3 },
   lip:        { label: 'リップ',         months: 4 },
-  mask:       { label: 'パック・マスク', months: 1 },
   body:       { label: 'ボディ・ハンド', months: 3 },
   hair:       { label: 'ヘアケア',       months: 2 },
   other:      { label: 'その他',         months: 3 },
 };
+
+const COSME_ORDER = Object.keys(COSME_CATEGORIES);
+// 使う順の位置（未知のカテゴリは末尾）
+function cosmeCategoryRank(cat) {
+  const i = COSME_ORDER.indexOf(cat);
+  return i === -1 ? COSME_ORDER.length : i;
+}
 
 // [表示名, カテゴリ, 読み(漢字・英字を含む名前だけ。ひらがな)]
 const COSME_MASTER = [
