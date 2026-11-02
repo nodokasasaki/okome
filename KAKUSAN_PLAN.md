@@ -29,9 +29,9 @@
 |---|------|--------|------------|------------|
 | ① | ランディングページ（LP）構築 | 🔴 最高 | 手動（一度だけ作成） | ✅ 完了 |
 | ② | OGP・SNSシェア設定 | 🔴 最高 | 手動（一度だけ設定） | ✅ 完了 |
-| ③ | SNSアカウント開設・AI自動投稿（Bluesky） | 🔴 最高 | ★★★ 全自動 | 🔧 移行中 |
+| ③ | SNSアカウント開設・AI自動投稿（Bluesky） | 🔴 最高 | ★★★ 全自動 | ✅ 完了 |
 | ④ | SEO対策（sitemap.xml / robots.txt） | 🟡 中 | ★★ 半自動 | 🔧 ファイル作成済み・GSC登録待ち |
-| ⑤ | プレスリリース（PR Times など） | 🟡 中 | 手動 | ⬜ 未着手 |
+| ⑤ | プレスリリース・告知記事（note / PR Times等） | 🟡 中 | 手動 | ⬜ 未着手 |
 | ⑥ | リファラル機能（友達招待） | 🟢 低 | ★★ 半自動 | ⬜ 未着手 |
 
 ---
@@ -189,14 +189,12 @@ jobs:
 4. 表示されたパスワードを `BLUESKY_APP_PASSWORD` として GitHub Secrets に登録
 
 ### 着手タスク
-- [ ] Bluesky アカウント開設（handle例：`ouchirhythm.bsky.social`）← **あなたが手動で行う**
-- [ ] Bluesky アプリパスワードを取得 ← **あなたが手動で行う**
-- [x] `.github/scripts/auto-post.js` を作成
-- [ ] `.github/scripts/auto-post.js` を Bluesky API 対応に書き換え ← **実装予定**
-- [x] `.github/workflows/sns-auto-post.yml` を作成
-- [ ] `.github/workflows/sns-auto-post.yml` を Bluesky 用シークレットに更新 ← **実装予定**
-- [ ] GitHub Repository Secrets に各キーを登録 ← **あなたが手動で行う**
-- [ ] 動作確認（手動トリガーで1回テスト投稿）
+- [x] Bluesky アカウント開設
+- [x] Bluesky アプリパスワードを取得
+- [x] `.github/scripts/auto-post.js` を作成（Bluesky AT Protocol API 対応）
+- [x] `.github/workflows/sns-auto-post.yml` を作成（Bluesky 用シークレット対応）
+- [x] GitHub Repository Secrets に各キーを登録
+- [x] 動作確認（手動トリガー／自動投稿確認）
 
 ---
 
